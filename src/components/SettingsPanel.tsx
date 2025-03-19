@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 
 interface Settings {
   hotkey: string;
@@ -11,6 +11,19 @@ interface Settings {
   sensitivity: number;
   useVAD: boolean;
   offlineMode: boolean;
+  activationMode: 'manual' | 'wake_word' | 'always_on';
+  ide: string;
+  deviceId?: number;
+  useGPU: boolean;
+  computeType: 'auto' | 'int8' | 'float16' | 'float32';
+}
+
+interface AudioDevice {
+  id: number;
+  name: string;
+  channels: number;
+  default: boolean;
+  sample_rates?: number;
 }
 
 interface SettingsPanelProps {
@@ -22,12 +35,68 @@ interface SettingsPanelProps {
 const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onSave, onClose }) => {
   const [localSettings, setLocalSettings] = useState<Settings>({ ...settings });
   const [sensitivityValue, setSensitivityValue] = useState<string>(settings.sensitivity.toString());
+  const [audioDevices, setAudioDevices] = useState<AudioDevice[]>([]);
+  const [isLoadingDevices, setIsLoadingDevices] = useState<boolean>(false);
+  
+  // Use a ref to track if the component is mounted
+  const isMounted = useRef(true);
   
   // Update local settings when props change
   useEffect(() => {
     setLocalSettings({ ...settings });
     setSensitivityValue(settings.sensitivity.toString());
   }, [settings]);
+  
+  // Set isMounted to false when component unmounts
+  useEffect(() => {
+    return () => {
+      isMounted.current = false;
+    };
+  }, []);
+  
+  // Load audio devices
+  useEffect(() => {
+    const loadAudioDevices = async () => {
+      setIsLoadingDevices(true);
+      
+      try {
+        // Request devices from backend
+        if (window.api) {
+          window.api.send('get-devices');
+          
+          // Set up listener for devices
+          const handleDevices = (message: string) => {
+            try {
+              // Only process if component is still mounted
+              if (!isMounted.current) return;
+              
+              const data = JSON.parse(message);
+              
+              if (data.type === 'devices') {
+                setAudioDevices(data.devices || []);
+                setIsLoadingDevices(false);
+              }
+            } catch (error) {
+              console.error('Error parsing devices message:', error);
+              if (isMounted.current) {
+                setIsLoadingDevices(false);
+              }
+            }
+          };
+          
+          // Add listener
+          window.api.receive('python-message', handleDevices);
+        }
+      } catch (error) {
+        console.error('Error loading audio devices:', error);
+        if (isMounted.current) {
+          setIsLoadingDevices(false);
+        }
+      }
+    };
+    
+    loadAudioDevices();
+  }, []);
   
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;
@@ -39,6 +108,10 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onSave, onClose
       const numValue = parseFloat(value);
       setSensitivityValue(value);
       setLocalSettings(prev => ({ ...prev, [name]: numValue }));
+    } else if (name === 'deviceId' && value !== '') {
+      // Convert device ID to number
+      const deviceId = parseInt(value, 10);
+      setLocalSettings(prev => ({ ...prev, [name]: deviceId }));
     } else {
       setLocalSettings(prev => ({ ...prev, [name]: value }));
     }
@@ -134,6 +207,36 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onSave, onClose
             </div>
           </div>
           
+          {/* Audio Settings */}
+          <div className="mb-6">
+            <h3 className="text-sm font-medium text-cyan-300 mb-3 border-b border-indigo-700 pb-1">
+              Audio Settings
+            </h3>
+            
+            <div className="mb-3">
+              <label htmlFor="deviceId" className="block mb-1 text-sm text-white">Audio Device</label>
+              <select 
+                name="deviceId" 
+                id="deviceId" 
+                value={localSettings.deviceId !== undefined ? localSettings.deviceId.toString() : ''}
+                onChange={handleChange}
+                className="w-full bg-indigo-800 text-white rounded p-2 border border-indigo-600 focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400"
+                aria-label="Select audio device"
+                disabled={isLoadingDevices}
+              >
+                <option value="">Default Device</option>
+                {audioDevices.map(device => (
+                  <option key={device.id} value={device.id.toString()}>
+                    {device.name} {device.default ? '(Default)' : ''}
+                  </option>
+                ))}
+              </select>
+              {isLoadingDevices && (
+                <p className="text-xs text-gray-400 mt-1">Loading audio devices...</p>
+              )}
+            </div>
+          </div>
+          
           {/* Transcription Settings */}
           <div className="mb-6">
             <h3 className="text-sm font-medium text-cyan-300 mb-3 border-b border-indigo-700 pb-1">
@@ -154,6 +257,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onSave, onClose
                 <option value="base">Base (Balanced)</option>
                 <option value="small">Small (More Accurate)</option>
                 <option value="medium">Medium (Most Accurate, Slower)</option>
+                <option value="large">Large (Highest Accuracy, Slowest)</option>
               </select>
             </div>
             
@@ -202,6 +306,37 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onSave, onClose
                 Offline Mode
               </label>
             </div>
+            
+            <div className="mb-3">
+              <label className="flex items-center text-white">
+                <input 
+                  type="checkbox" 
+                  name="useGPU" 
+                  id="useGPU" 
+                  checked={localSettings.useGPU}
+                  onChange={handleChange}
+                  className="mr-2 bg-indigo-700 border-indigo-600 text-cyan-400 focus:ring-cyan-400"
+                />
+                Use GPU Acceleration (if available)
+              </label>
+            </div>
+            
+            <div className="mb-3">
+              <label htmlFor="computeType" className="block mb-1 text-sm text-white">Compute Type</label>
+              <select 
+                name="computeType" 
+                id="computeType" 
+                value={localSettings.computeType}
+                onChange={handleChange}
+                className="w-full bg-indigo-800 text-white rounded p-2 border border-indigo-600 focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400"
+                aria-label="Select compute type"
+              >
+                <option value="auto">Auto (Recommended)</option>
+                <option value="int8">Int8 (Faster, Less Accurate)</option>
+                <option value="float16">Float16 (GPU Optimized)</option>
+                <option value="float32">Float32 (Most Accurate, Slowest)</option>
+              </select>
+            </div>
           </div>
           
           {/* Activation Settings */}
@@ -209,6 +344,22 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onSave, onClose
             <h3 className="text-sm font-medium text-cyan-300 mb-3 border-b border-indigo-700 pb-1">
               Activation Settings
             </h3>
+            
+            <div className="mb-3">
+              <label htmlFor="activationMode" className="block mb-1 text-sm text-white">Activation Mode</label>
+              <select 
+                name="activationMode" 
+                id="activationMode" 
+                value={localSettings.activationMode}
+                onChange={handleChange}
+                className="w-full bg-indigo-800 text-white rounded p-2 border border-indigo-600 focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400"
+                aria-label="Select activation mode"
+              >
+                <option value="manual">Manual (Hotkey)</option>
+                <option value="wake_word">Wake Word</option>
+                <option value="always_on">Always On</option>
+              </select>
+            </div>
             
             <div className="mb-3">
               <label htmlFor="hotkey" className="block mb-1 text-sm text-white">Hotkey</label>
@@ -233,7 +384,33 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onSave, onClose
                 value={localSettings.wakeWord}
                 onChange={handleChange}
                 className="w-full bg-indigo-800 text-white rounded p-2 border border-indigo-600 focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400"
+                disabled={localSettings.activationMode !== 'wake_word'}
               />
+            </div>
+          </div>
+          
+          {/* IDE Integration */}
+          <div className="mb-6">
+            <h3 className="text-sm font-medium text-cyan-300 mb-3 border-b border-indigo-700 pb-1">
+              IDE Integration
+            </h3>
+            
+            <div className="mb-3">
+              <label htmlFor="ide" className="block mb-1 text-sm text-white">IDE</label>
+              <select 
+                name="ide" 
+                id="ide" 
+                value={localSettings.ide}
+                onChange={handleChange}
+                className="w-full bg-indigo-800 text-white rounded p-2 border border-indigo-600 focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400"
+                aria-label="Select IDE"
+              >
+                <option value="">Auto-detect</option>
+                <option value="vscode">VS Code</option>
+                <option value="cursor">Cursor</option>
+                <option value="roocode">Roo Code</option>
+                <option value="openai">OpenAI Chat</option>
+              </select>
             </div>
           </div>
         </form>

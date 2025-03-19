@@ -47,15 +47,17 @@ except ImportError as e:
 class AudioProcessor:
     """Handles audio capture and processing."""
     
-    def __init__(self, sample_rate: int = 16000, chunk_size: int = 4000):
+    def __init__(self, sample_rate: int = 16000, chunk_size: int = 4000, device_id: Optional[int] = None):
         """Initialize the audio processor.
         
         Args:
             sample_rate: Audio sample rate in Hz
             chunk_size: Number of samples per chunk
+            device_id: Audio device ID (None for default)
         """
         self.sample_rate = sample_rate
         self.chunk_size = chunk_size
+        self.device_id = device_id
         self.audio_buffer = []
         self.is_recording = False
         self.recording_thread = None
@@ -84,11 +86,12 @@ class AudioProcessor:
             try:
                 with sd.InputStream(
                     samplerate=self.sample_rate,
+                    device=self.device_id,
                     channels=1,
                     dtype='float32',
                     callback=self._audio_callback
                 ):
-                    logger.info("Audio stream started")
+                    logger.info(f"Audio stream started with device ID: {self.device_id}")
                     
                     # Keep the stream open while recording
                     while self.is_recording:
@@ -178,12 +181,46 @@ class AudioProcessor:
                         'id': i,
                         'name': device['name'],
                         'channels': device['max_input_channels'],
-                        'default': device.get('default_input', False)
+                        'default': device.get('default_input', False),
+                        'sample_rates': device.get('default_samplerate', 44100)
                     })
+                    
+                    # Log device info for debugging
+                    logger.info(f"Found audio device: {device['name']} (ID: {i}, Channels: {device['max_input_channels']})")
+                    
+                    # Check if this is a Focusrite device
+                    if 'focusrite' in device['name'].lower() or 'clarett' in device['name'].lower():
+                        logger.info(f"Detected Focusrite audio interface: {device['name']}")
         except Exception as e:
             logger.error(f"Error getting audio devices: {e}")
         
         return devices
+    
+    def set_device(self, device_id: int) -> bool:
+        """Set the audio device.
+        
+        Args:
+            device_id: Audio device ID
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            # Check if device exists
+            devices = sd.query_devices()
+            if device_id >= len(devices):
+                logger.error(f"Invalid device ID: {device_id}")
+                return False
+            
+            # Set device
+            self.device_id = device_id
+            logger.info(f"Audio device set to: {devices[device_id]['name']} (ID: {device_id})")
+            
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error setting audio device: {e}")
+            return False
 
 
 class WhisperTranscriber:
@@ -192,19 +229,36 @@ class WhisperTranscriber:
     # Model size options
     MODEL_SIZES = ["tiny", "base", "small", "medium", "large"]
     
-    def __init__(self, model_size: str = "base", device: str = "cpu"):
+    def __init__(self, model_size: str = "base", device: str = "auto", compute_type: str = "auto"):
         """Initialize the transcriber.
         
         Args:
             model_size: Whisper model size
-            device: Device to run the model on ("cpu" or "cuda")
+            device: Device to run the model on ("cpu", "cuda", or "auto")
+            compute_type: Compute type ("int8", "float16", "float32", or "auto")
         """
         if model_size not in self.MODEL_SIZES:
             logger.warning(f"Invalid model size: {model_size}. Using 'base' instead.")
             model_size = "base"
         
         self.model_size = model_size
-        self.device = device
+        
+        # Determine device
+        if device == "auto":
+            import torch
+            self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        else:
+            self.device = device
+        
+        # Determine compute type
+        if compute_type == "auto":
+            if self.device == "cuda":
+                self.compute_type = "float16"  # Better for GPU
+            else:
+                self.compute_type = "int8"  # Better for CPU
+        else:
+            self.compute_type = compute_type
+        
         self.model = None
         
         # Load the model
@@ -212,7 +266,7 @@ class WhisperTranscriber:
     
     def _load_model(self) -> None:
         """Load the Whisper model."""
-        logger.info(f"Loading Whisper model: {self.model_size}")
+        logger.info(f"Loading Whisper model: {self.model_size} on {self.device} with {self.compute_type}")
         
         try:
             # Check if models directory exists
@@ -224,7 +278,7 @@ class WhisperTranscriber:
             self.model = WhisperModel(
                 model_size_or_path=self.model_size,
                 device=self.device,
-                compute_type="int8",  # Use int8 quantization for efficiency
+                compute_type=self.compute_type,
                 download_root=models_dir
             )
             
@@ -290,10 +344,22 @@ class GenieWhisperServer:
         self.wake_word = args.wake_word
         self.activation_mode = args.activation_mode
         self.ide = args.ide
+        self.device_id = args.device_id
+        self.compute_type = args.compute_type
+        
+        # Determine device for Whisper
+        if args.gpu and self._is_gpu_available():
+            self.device = "cuda"
+        else:
+            self.device = "cpu"
         
         # Initialize components
-        self.audio_processor = AudioProcessor()
-        self.transcriber = WhisperTranscriber(model_size=self.model_size)
+        self.audio_processor = AudioProcessor(device_id=self.device_id)
+        self.transcriber = WhisperTranscriber(
+            model_size=self.model_size,
+            device=self.device,
+            compute_type=self.compute_type
+        )
         
         # Initialize wake word detector if needed
         if self.activation_mode == "wake_word":
@@ -315,9 +381,24 @@ class GenieWhisperServer:
         self.is_listening = False
         self.wake_word_active = False
     
+    def _is_gpu_available(self) -> bool:
+        """Check if GPU is available.
+        
+        Returns:
+            True if GPU is available, False otherwise
+        """
+        try:
+            import torch
+            return torch.cuda.is_available()
+        except ImportError:
+            return False
+    
     def start(self) -> None:
         """Start the server."""
         logger.info("Starting Genie Whisper server")
+        
+        # Log system info
+        self._log_system_info()
         
         # Send initial status
         self._send_message({
@@ -346,6 +427,37 @@ class GenieWhisperServer:
             logger.error(f"Server error: {e}")
         finally:
             self._cleanup()
+    
+    def _log_system_info(self) -> None:
+        """Log system information."""
+        logger.info("System Information:")
+        logger.info(f"Python version: {sys.version}")
+        logger.info(f"Operating system: {os.name} - {sys.platform}")
+        
+        # Log CPU info
+        try:
+            import psutil
+            logger.info(f"CPU: {psutil.cpu_count(logical=False)} cores, {psutil.cpu_count()} threads")
+            logger.info(f"Memory: {psutil.virtual_memory().total / (1024**3):.2f} GB")
+        except ImportError:
+            logger.info("psutil not available, skipping CPU/memory info")
+        
+        # Log GPU info
+        try:
+            import torch
+            if torch.cuda.is_available():
+                logger.info(f"GPU: {torch.cuda.get_device_name(0)}")
+                logger.info(f"CUDA version: {torch.version.cuda}")
+                logger.info(f"GPU memory: {torch.cuda.get_device_properties(0).total_memory / (1024**3):.2f} GB")
+            else:
+                logger.info("No GPU available")
+        except ImportError:
+            logger.info("PyTorch not available, skipping GPU info")
+        
+        # Log audio devices
+        logger.info("Audio devices:")
+        for device in self.audio_processor.get_audio_devices():
+            logger.info(f"  {device['name']} (ID: {device['id']}, Channels: {device['channels']})")
     
     def _read_command(self) -> Optional[Dict]:
         """Read command from stdin."""
@@ -382,6 +494,8 @@ class GenieWhisperServer:
             self._stop_listening()
         elif cmd_type == "get_devices":
             self._get_audio_devices()
+        elif cmd_type == "set_device":
+            self._set_audio_device(command.get("device_id"))
         elif cmd_type == "update_settings":
             self._update_settings(command.get("settings", {}))
         elif cmd_type == "inject_text":
@@ -512,12 +626,34 @@ class GenieWhisperServer:
             "devices": devices
         })
     
+    def _set_audio_device(self, device_id: Optional[int]) -> None:
+        """Set the audio device.
+        
+        Args:
+            device_id: Audio device ID
+        """
+        if device_id is None:
+            logger.warning("No device ID provided")
+            return
+        
+        success = self.audio_processor.set_device(device_id)
+        
+        self._send_message({
+            "type": "device_set",
+            "success": success,
+            "device_id": device_id
+        })
+    
     def _update_settings(self, settings: Dict) -> None:
         """Update server settings."""
         # Update model size if changed
         if "modelSize" in settings and settings["modelSize"] != self.model_size:
             self.model_size = settings["modelSize"]
-            self.transcriber = WhisperTranscriber(model_size=self.model_size)
+            self.transcriber = WhisperTranscriber(
+                model_size=self.model_size,
+                device=self.device,
+                compute_type=self.compute_type
+            )
         
         # Update other settings
         if "sensitivity" in settings:
@@ -558,6 +694,9 @@ class GenieWhisperServer:
         
         if "ide" in settings:
             self.ide = settings["ide"]
+        
+        if "deviceId" in settings and settings["deviceId"] != self.device_id:
+            self._set_audio_device(settings["deviceId"])
         
         self._send_message({
             "type": "status",
@@ -663,6 +802,28 @@ def parse_args():
         type=str,
         default=None,
         help="IDE to inject text into (vscode, cursor, roocode, openai, or none for auto-detection)"
+    )
+    
+    parser.add_argument(
+        "--device-id",
+        type=int,
+        default=None,
+        help="Audio device ID (None for default)"
+    )
+    
+    parser.add_argument(
+        "--gpu",
+        type=lambda x: x.lower() == "true",
+        default=True,
+        help="Use GPU for transcription if available"
+    )
+    
+    parser.add_argument(
+        "--compute-type",
+        type=str,
+        default="auto",
+        choices=["auto", "int8", "float16", "float32"],
+        help="Compute type for Whisper model"
     )
     
     return parser.parse_args()
