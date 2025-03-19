@@ -1,0 +1,259 @@
+/* Main styles for Genie Whisper */
+
+/* Global styles */
+:root {
+  --primary-color: #3b82f6;
+  --primary-hover: #2563eb;
+  --secondary-color: #6b7280;
+  --background-dark: #1f2937;
+  --background-light: #f3f4f6;
+  --text-light: #f9fafb;
+  --text-dark: #111827;
+  --success-color: #10b981;
+  --error-color: #ef4444;
+  --warning-color: #f59e0b;
+  --info-color: #3b82f6;
+  --border-radius: 8px;
+  --transition-speed: 0.2s;
+  
+  /* Genie Whisper specific colors */
+  --genie-bg: #312e81; /* indigo-950 */
+  --genie-accent: #22d3ee; /* cyan-400 */
+  --genie-accent-alt: #f472b6; /* pink-400 */
+}
+
+/* Make the window draggable */
+.draggable {
+  -webkit-app-region: drag;
+}
+
+.draggable button {
+  -webkit-app-region: no-drag;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(31, 41, 55, 0.5);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(107, 114, 128, 0.5);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(107, 114, 128, 0.8);
+}
+
+/* Animations */
+@keyframes pulse {
+  0% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.05);
+    opacity: 0.8;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/* Genie avatar animation */
+.listening #genie-avatar img {
+  animation: pulse 1.5s infinite ease-in-out;
+}
+
+/* Waveform styling */
+.waveform-bar {
+  width: 4px;
+  min-height: 5px;
+  border-radius: 2px;
+  transition: height 0.2s ease;
+}
+
+/* Waveform container */
+#waveform {
+  position: relative;
+  overflow: hidden;
+}
+
+/* Transcription preview styling */
+#transcription-preview {
+  transition: all var(--transition-speed) ease;
+}
+
+.listening #transcription-preview {
+  border-left: 3px solid var(--genie-accent);
+}
+
+/* Button states */
+#listen-btn.listening {
+  background-color: var(--error-color);
+}
+
+#listen-btn.listening:hover {
+  background-color: #dc2626;
+}
+
+/* Settings panel animation */
+#settings-panel {
+  animation: fadeIn 0.3s ease;
+}
+
+/* Range input styling */
+input[type="range"] {
+  -webkit-appearance: none;
+  height: 8px;
+  background: #4b5563;
+  border-radius: 4px;
+  outline: none;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--genie-accent);
+  cursor: pointer;
+  transition: background var(--transition-speed) ease;
+}
+
+input[type="range"]::-webkit-slider-thumb:hover {
+  background: #06b6d4;
+}
+
+/* Checkbox styling */
+input[type="checkbox"] {
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  background: #4b5563;
+  position: relative;
+  cursor: pointer;
+}
+
+input[type="checkbox"]:checked {
+  background: var(--genie-accent);
+}
+
+input[type="checkbox"]:checked::after {
+  content: '';
+  position: absolute;
+  width: 4px;
+  height: 8px;
+  border: solid white;
+  border-width: 0 2px 2px 0;
+  top: 2px;
+  left: 6px;
+  transform: rotate(45deg);
+}
+
+/* Status indicator */
+#status {
+  transition: all var(--transition-speed) ease;
+}
+
+.listening #status {
+  color: var(--genie-accent);
+}
+
+/* Media queries for responsive design */
+@media (max-width: 640px) {
+  #app {
+    width: 100%;
+    height: 100%;
+  }
+}
+
+/* Smoke/mist effect for Genie */
+@keyframes smoke-1 {
+  0% { transform: translateY(10px) scale(0.5); opacity: 0; }
+  25% { opacity: 0.5; }
+  50% { transform: translateY(-15px) translateX(5px) scale(0.8); opacity: 0.8; }
+  100% { transform: translateY(-30px) translateX(-5px) scale(1.2); opacity: 0; }
+}
+
+@keyframes smoke-2 {
+  0% { transform: translateY(5px) scale(0.5); opacity: 0; }
+  25% { opacity: 0.7; }
+  50% { transform: translateY(-20px) translateX(-7px) scale(0.9); opacity: 0.6; }
+  100% { transform: translateY(-40px) translateX(5px) scale(1.3); opacity: 0; }
+}
+
+@keyframes smoke-3 {
+  0% { transform: translateY(10px) scale(0.5); opacity: 0; }
+  25% { opacity: 0.3; }
+  50% { transform: translateY(-15px) translateX(10px) scale(1); opacity: 0.5; }
+  100% { transform: translateY(-35px) translateX(-10px) scale(1.5); opacity: 0; }
+}
+
+.smoke-1, .smoke-2, .smoke-3 {
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background-color: rgba(6, 182, 212, 0.3);
+  bottom: 0;
+  filter: blur(7px);
+}
+
+.smoke-1 {
+  left: 30%;
+  animation: smoke-1 3s infinite;
+}
+
+.smoke-2 {
+  left: 50%;
+  animation: smoke-2 4s infinite 1s;
+}
+
+.smoke-3 {
+  left: 60%;
+  animation: smoke-3 3.5s infinite 0.5s;
+}
+
+/* Typing cursor animation */
+@keyframes blink {
+  from, to { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+.typing-cursor {
+  display: inline-block;
+  width: 2px;
+  height: 1.2em;
+  background-color: #22d3ee;
+  margin-left: 2px;
+  vertical-align: middle;
+  animation: blink 1s step-end infinite;
+}

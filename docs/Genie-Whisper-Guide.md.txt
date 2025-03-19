@@ -1,0 +1,145 @@
+### **Comprehensive Development Plan & Guide for Genie Whisper**
+A **real-time voice-to-text transcription tool** designed to work **offline and online**, integrating seamlessly with **Cursor, VS Code, Roo Code, and Cline Dev**. This tool enables users to **speak prompts** instead of typing, using **OpenAI Whisper** for transcription with **intelligent speech filtering**, a **futuristic UI**, and **global overlay support**.
+
+---
+
+# **1. Project Scope & Features**
+## **🛠 Core Functionalities**
+| Feature | Description |
+|---------|------------|
+| **Real-Time Speech-to-Text** | Converts voice input into text using **OpenAI Whisper** (optimized via **Whisper.cpp** or **Faster-Whisper**). |
+| **Offline & Online Mode** | Runs **locally**, with optional **cloud-based fallback** if needed. |
+| **Global UI Overlay** | Toggleable UI overlay that works across **PC, Cursor, VS Code IDEs**. |
+| **Intelligent Speech Filtering** | Uses **Voice Activity Detection (VAD)** to **ignore background noise and random conversations**. |
+| **Live Waveform Visualization** | Displays real-time waveform during speech. |
+| **Animated Genie Avatar** | A dynamic avatar that "speaks" transcribed text. |
+| **Hotkey & Wake Word Activation** | Allows **push-to-talk, wake-word mode ("Hey Genie"), or always-on transcription**. |
+| **Direct IDE Integration** | Seamlessly injects text into **Cursor, VS Code, Roo Code, and OpenAI chat UI**. |
+| **Minimal Latency** | Optimized for **fast transcription (<1 sec lag)** with **lightweight models**. |
+| **System Tray & Toggle Control** | UI settings panel to enable/disable transcription, set wake-word, and configure sensitivity. |
+
+---
+
+# **2. Tech Stack**
+## **🖥 Frontend (Electron)**
+| Component | Technology |
+|-----------|------------|
+| **UI Framework** | **Electron.js** (for cross-platform desktop UI) |
+| **Waveform Visualization** | **Wavesurfer.js** / **Canvas API** |
+| **Genie Animation** | **Lottie.js / Three.js** (for fluid animated responses) |
+| **Microphone Input** | **WebRTC API** (real-time voice capture) |
+| **Global Overlay** | **Electron window overlays + VS Code panel extension** |
+
+## **⚙ Backend (Python)**
+| Component | Technology |
+|-----------|------------|
+| **Speech-to-Text Engine** | **Whisper.cpp** (local) / **Faster-Whisper** (Python API) |
+| **Voice Activity Detection** | **Silero VAD / WebRTC VAD** (to filter unwanted speech) |
+| **Audio Processing** | **PyAudio, SoundDevice** (captures and streams audio to STT engine) |
+| **Live Transcription Buffer** | **Socket.io / Python FastAPI** (for real-time data exchange) |
+| **System Control** | **Electron-Python bridge** (IPC for UI-to-backend communication) |
+
+---
+
+# **3. System Architecture**
+### **🔄 Workflow Overview**
+1. **User Activates the Transcriber** (via hotkey, wake word, or manual toggle).
+2. **Microphone Input Captured** (WebRTC API or PyAudio).
+3. **Voice Activity Detection (VAD) Filters Noise** (ensures only intended speech is processed).
+4. **Whisper Transcribes Speech** (low-latency transcription streamed in real-time).
+5. **Live Waveform & Genie Animation Update** (electron UI reflects activity).
+6. **Text Appears in Preview Window** (user sees transcription before sending).
+7. **Transcribed Text Injected into IDE or Chat UI** (Cursor, VS Code, Roo Code, OpenAI chat).
+8. **Auto-Stop on Silence** (when no speech is detected, system stops transcribing).
+
+---
+
+# **4. UI Design & Experience**
+## **🎨 Visual & Functional Design**
+| Component | Description |
+|-----------|------------|
+| **Minimalist Overlay UI** | Small floating window, **toggleable, draggable, and resizable**. |
+| **Dark Mode & Neon Accents** | **Futuristic styling** with electric blue/cyan waveforms. |
+| **Genie Avatar** | Appears & animates **only when active**, with lip-sync effects. |
+| **Live Waveform** | **Real-time frequency visualization** of user's voice. |
+| **Push-to-Talk Button** | For manual control of speech-to-text. |
+| **Settings Panel** | Toggle modes, adjust sensitivity, select models (Tiny/Base/Large). |
+| **Hotkeys & Wake Words** | Customizable for hands-free usage. |
+
+---
+
+# **5. Development Strategy**
+## **🚀 Phase 1: Core Implementation**
+✅ **Set up Electron UI** (floating overlay, system tray controls).  
+✅ **Integrate Python backend with Whisper** (run local STT model).  
+✅ **Implement Voice Activity Detection (VAD)** (filters out background noise).  
+✅ **Create live waveform & basic Genie animation**.  
+✅ **Enable text injection into VS Code / Cursor / Roo Code chat fields**.  
+
+## **🎯 Phase 2: UI/UX Enhancements**
+✅ **Improve Genie animations & speech-sync effects**.  
+✅ **Add customizable themes & dark mode adjustments**.  
+✅ **Implement push-to-talk, wake-word, & always-on modes**.  
+✅ **Refine performance for low-latency transcription**.  
+
+## **⚡ Phase 3: Production Features**
+✅ **Integrate cloud Whisper API as an optional fallback**.  
+✅ **Implement multilingual support (optional)**.  
+✅ **Develop full VS Code extension for native integration**.  
+✅ **Optimize CPU/GPU performance for real-time Whisper inference**.  
+
+---
+
+# **6. Installation & Setup**
+### **📌 Requirements**
+- **Node.js (for Electron)**
+- **Python 3.9+ (for Whisper backend)**
+- **FFmpeg (for audio processing)**
+- **Whisper.cpp / Faster-Whisper (for STT engine)**
+- **PyAudio / SoundDevice (for capturing microphone input)**
+- **Electron.js (UI framework)**
+- **Wavesurfer.js / Three.js (visualizations & Genie animations)**
+
+### **💻 Installation Steps**
+1. **Clone the Repo & Install Dependencies**
+   ```sh
+   git clone https://github.com/user/genie-whisper
+   cd genie-whisper
+   npm install  # Install Electron dependencies
+   pip install -r requirements.txt  # Install Python dependencies
+   ```
+
+2. **Run the Application**
+   ```sh
+   npm start  # Start Electron UI
+   python backend/server.py  # Start Whisper backend
+   ```
+
+3. **Configure VS Code Extension (Optional)**
+   - Install **Genie Whisper Extension** inside VS Code.
+   - Enable **transcription auto-injection** for OpenAI chat, Cursor, and Roo Code.
+
+---
+
+# **7. Deployment & Future Expansion**
+| Task | Future Enhancements |
+|------|---------------------|
+| **Multilingual Whisper Support** | Allow **multi-language transcriptions** (future update). |
+| **Machine Learning Tuning** | Train **custom fine-tuned models** for improved accuracy. |
+| **WebRTC-Based Streaming** | Enable real-time collaboration with **shared voice input**. |
+| **Personalized AI Voice Response** | Add **TTS (Text-to-Speech) for voice output**. |
+| **Web-Based UI** | Expand functionality to **browser-based Genie Whisper**. |
+
+---
+
+# **Final Notes**
+✅ **Electron + Python Hybrid Approach** ensures **best UI experience + powerful STT backend**.  
+✅ **Designed for speed, efficiency, and minimal resource usage**.  
+✅ **Seamless IDE integration (Cursor, Roo Code, VS Code)** for AI-driven coding.  
+✅ **Scalable & Modular** – can evolve with **future AI advancements**.  
+
+---
+
+# **🚀 Ready to Build Genie Whisper!**
+This document serves as a **full technical roadmap** for development in **Cline Dev or Roo Code (VS Code)**. Everything is covered, from **architecture to deployment**. The tool will revolutionize **hands-free coding** and bring **futuristic AI interaction** to **development workflows**.
+

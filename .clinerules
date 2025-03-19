@@ -1,0 +1,166 @@
+# Genie Whisper Project Rules
+
+## Project Overview
+Genie Whisper is a real-time voice-to-text transcription tool designed to work offline and online, integrating with Cursor, VS Code, Roo Code, and Cline Dev. This tool enables users to speak prompts instead of typing, using OpenAI Whisper for transcription with intelligent speech filtering, a futuristic UI, and global overlay support.
+
+## Project Structure
+- `/electron` - Electron main process code
+- `/src` - Frontend React components and logic
+- `/python` - Python backend for Whisper and audio processing
+- `/models` - Pre-downloaded Whisper models
+- `/extensions` - IDE extensions for VS Code, Cursor, etc.
+- `/scripts` - Build and utility scripts
+- `/docs` - Project documentation
+- `/memory-bank` - Roo Code memory bank files
+
+## Coding Standards
+
+### General
+- Use TypeScript for all JavaScript code
+- Use Python 3.9+ for backend code
+- Follow consistent naming conventions across the codebase
+- Write comprehensive documentation for all public APIs
+- Include unit tests for all new functionality
+
+### Frontend (TypeScript/React)
+- Use functional components with hooks
+- Use Tailwind CSS for styling
+- Follow React best practices for state management
+- Use TypeScript interfaces for prop types
+- Implement responsive design for all UI components
+
+### Backend (Python)
+- Follow PEP 8 style guide
+- Use type hints for all functions
+- Implement proper error handling and logging
+- Use async/await for I/O operations where appropriate
+- Document all functions with docstrings
+
+### Electron
+- Keep main process code minimal and focused
+- Use IPC for communication between processes
+- Follow security best practices for Electron apps
+- Implement proper window management
+- Handle system events appropriately
+
+## Git Workflow
+- Use feature branches for all new development
+- Create pull requests for code review
+- Write descriptive commit messages
+- Squash commits before merging
+- Keep PRs focused and reasonably sized
+
+## Build and Deployment
+- Use Electron Forge for packaging
+- Implement CI/CD with GitHub Actions
+- Automate testing before deployment
+- Version using semantic versioning
+- Sign all production builds
+
+## Testing Strategy
+- Write unit tests for all components
+- Implement integration tests for critical paths
+- Perform cross-platform testing
+- Test with different microphone setups
+- Benchmark performance regularly
+
+## Documentation Requirements
+- Update Memory Bank files when making significant changes
+- Document all public APIs
+- Include usage examples
+- Keep README up to date
+- Document known issues and workarounds
+
+## Performance Guidelines
+- Optimize for low latency in the transcription pipeline
+- Minimize CPU usage, especially when idle
+- Implement efficient audio processing
+- Use appropriate Whisper model sizes
+- Profile and optimize critical paths
+
+## Security Considerations
+- Process audio locally by default
+- Implement secure storage for API keys
+- Follow Electron security best practices
+- Respect user privacy
+- Implement proper permission handling
+
+## Accessibility
+- Support keyboard shortcuts
+- Implement proper focus management
+- Use semantic HTML
+- Provide visual feedback
+- Consider color contrast
+
+## Project-Specific Patterns
+
+### Audio Processing Pipeline
+```
+Microphone Input → Chunking → VAD Filtering → Whisper Processing → Text Output
+```
+
+### UI Component Hierarchy
+```
+App
+├── TrayIcon
+├── OverlayWindow
+│   ├── WaveformVisualization
+│   ├── GenieAvatar
+│   ├── TranscriptionPreview
+│   └── ControlButtons
+└── SettingsPanel
+    ├── GeneralSettings
+    ├── AudioSettings
+    ├── TranscriptionSettings
+    ├── UISettings
+    └── IntegrationSettings
+```
+
+### State Management
+- Use React Context for global state
+- Use local state for component-specific state
+- Use Electron store for persistent settings
+- Implement proper state synchronization between processes
+
+### Error Handling
+- Implement graceful degradation
+- Provide clear error messages
+- Log errors for debugging
+- Recover from common errors automatically
+- Implement proper error boundaries
+
+## IDE Integration
+- Implement clipboard-based fallback for all IDEs
+- Use native extensions where possible
+- Support text injection at cursor position
+- Handle different text field types
+- Support markdown and code formatting
+
+## User Preferences
+- Allow customization of hotkeys
+- Support different activation methods
+- Allow model selection
+- Provide theme options
+- Remember window positions
+
+## Memory Bank Updates
+- Update activeContext.md with current focus
+- Update progress.md after significant milestones
+- Update systemPatterns.md when architecture changes
+- Update techContext.md when dependencies change
+- Update productContext.md when user experience goals change
+
+## Development Workflow
+1. Check Memory Bank for context
+2. Implement features according to current focus
+3. Test thoroughly
+4. Update documentation
+5. Create pull request
+6. Update Memory Bank after merging
+
+## Project Intelligence
+- Whisper works best with clear speech and minimal background noise
+- Voice Activity Detection is critical for usability
+- UI responsiveness is essential for good user experience
+- Cross-platform audio capture requires careful abstraction
+- IDE integration complexity varies significantly between environments
