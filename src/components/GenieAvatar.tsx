@@ -37,18 +37,47 @@ const GenieAvatar: React.FC<GenieAvatarProps> = ({ isListening }) => {
           background: 'radial-gradient(circle, rgba(6, 182, 212, 0.3) 0%, rgba(6, 182, 212, 0) 70%)'
         }}></div>
         
-        {/* Genie image */}
+        {/* Genie smoke silhouette SVG */}
         <div className="relative w-24 h-24 flex items-center justify-center">
-          <img 
-            src="../images/genie_without_background.png" 
-            alt="Genie" 
-            className="w-full h-full object-contain z-10"
+          <svg 
+            viewBox="0 0 100 100" 
+            className="w-full h-full z-10"
             style={{
-              filter: `brightness(1.2) drop-shadow(0 0 5px rgba(6, 182, 212, ${isListening ? '0.8' : '0.4'}))`,
+              filter: `drop-shadow(0 0 5px rgba(6, 182, 212, ${isListening ? '0.8' : '0.4'}))`,
               transition: 'all 0.3s ease-in-out',
               transform: isListening ? 'scale(1.05)' : 'scale(1)'
             }}
-          />
+          >
+            {/* Genie smoke silhouette */}
+            <path
+              d="M50,80 C60,80 65,75 65,65 C65,55 60,50 65,40 C70,30 65,20 55,15 C45,10 40,15 35,10 C30,5 20,10 15,20 C10,30 15,40 20,45 C25,50 30,55 25,65 C20,75 30,80 40,80 L50,80 Z"
+              fill="url(#genieGradient)"
+              opacity="0.9"
+            />
+            
+            {/* Small wisp 1 */}
+            <path
+              d="M40,15 C45,10 50,15 45,20 C40,25 35,20 40,15 Z"
+              fill="url(#genieGradient)"
+              opacity="0.7"
+            />
+            
+            {/* Small wisp 2 */}
+            <path
+              d="M60,25 C65,20 70,25 65,30 C60,35 55,30 60,25 Z"
+              fill="url(#genieGradient)"
+              opacity="0.7"
+            />
+            
+            {/* Gradient definition */}
+            <defs>
+              <linearGradient id="genieGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor="#06b6d4" stopOpacity="0.8" />
+                <stop offset="50%" stopColor="#0ea5e9" stopOpacity="0.6" />
+                <stop offset="100%" stopColor="#2563eb" stopOpacity="0.4" />
+              </linearGradient>
+            </defs>
+          </svg>
           
           {/* Animated smoke/mist effect when listening */}
           {isListening && (
@@ -60,7 +89,7 @@ const GenieAvatar: React.FC<GenieAvatarProps> = ({ isListening }) => {
           )}
         </div>
         
-        {/* Microphone icon when not showing full genie */}
+        {/* Microphone icon when not listening */}
         {!isListening && (
           <div className="absolute inset-0 flex items-center justify-center">
             <svg 
@@ -119,6 +148,12 @@ const GenieAvatar: React.FC<GenieAvatarProps> = ({ isListening }) => {
           25% { opacity: 0.3; }
           50% { transform: translateY(-15px) translateX(10px) scale(1); opacity: 0.5; }
           100% { transform: translateY(-35px) translateX(-10px) scale(1.5); opacity: 0; }
+        }
+        
+        @keyframes float {
+          0% { transform: translateY(0px); }
+          50% { transform: translateY(-5px); }
+          100% { transform: translateY(0px); }
         }
         
         .smoke-1, .smoke-2, .smoke-3 {
