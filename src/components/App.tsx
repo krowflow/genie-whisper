@@ -1,8 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import WaveformVisualizer from './WaveformVisualizer';
-import GenieAvatar from './GenieAvatar';
-import TranscriptionPreview from './TranscriptionPreview';
+import TabNavigation from './TabNavigation';
+import MainTab from './MainTab';
+import SettingsTab from './SettingsTab';
+import DevicesTab from './DevicesTab';
+import HelpTab from './HelpTab';
 import SettingsPanel from './SettingsPanel';
+import TranscriptionPreview from './TranscriptionPreview';
+import GenieAvatar from './GenieAvatar';
+import WaveformVisualizer from './WaveformVisualizer';
 
 interface Settings {
   hotkey: string;
@@ -46,6 +51,7 @@ const App: React.FC = () => {
   const [showTranscription, setShowTranscription] = useState<boolean>(false);
   const [settings, setSettings] = useState<Settings>(defaultSettings);
   const [status, setStatus] = useState<string>('Ready');
+  const [activeTab, setActiveTab] = useState<string>('main');
 
   useEffect(() => {
     // Load settings from Electron store
@@ -67,7 +73,7 @@ const App: React.FC = () => {
       });
 
       window.api.receive('show-settings', () => {
-        setShowSettings(true);
+        setActiveTab('settings');
       });
 
       window.api.receive('python-message', handlePythonMessage);
@@ -151,7 +157,6 @@ const App: React.FC = () => {
       window.api.send('update-settings', newSettings);
     }
     
-    setShowSettings(false);
     setStatus('Settings saved');
     
     setTimeout(() => {
@@ -222,8 +227,8 @@ const App: React.FC = () => {
           <h1 className="text-sm font-medium text-gray-400">Genie Whisper</h1>
         </div>
         <div className="flex space-x-2">
-          <button 
-            onClick={() => setShowSettings(true)}
+          <button
+            onClick={() => setActiveTab('settings')}
             className="text-gray-400 hover:text-cyan-400"
             title="Settings"
             aria-label="Settings"
@@ -266,32 +271,40 @@ const App: React.FC = () => {
           <p className="text-xs text-gray-400">Your Voice-to-Text Assistant</p>
         </div>
         
-        {/* Transcription preview (only shown when there's transcription) */}
-        {showTranscription && transcription && (
-          <div className="w-full mb-4">
-            <TranscriptionPreview text={transcription} isListening={isListening} />
-          </div>
-        )}
+        {/* Tab Navigation */}
+        <TabNavigation activeTab={activeTab} onTabChange={setActiveTab} />
         
-        {/* Main UI area with Genie on left, waveform in center, mic on right */}
-        <div className="flex-grow flex flex-col justify-center">
-          {/* Waveform with Genie and Mic on sides */}
-          <div className="flex items-center justify-between w-full">
-            {/* Genie Avatar on left */}
-            <div className="w-1/4 flex justify-center" onClick={toggleListening}>
-              <GenieAvatar isListening={isListening} />
-            </div>
-            
-            {/* Waveform in center */}
-            <div className="w-2/4">
-              <WaveformVisualizer isListening={isListening} />
-            </div>
-            
-            {/* Microphone button on right */}
-            <div className="w-1/4 flex justify-center">
-              <MicrophoneButton />
-            </div>
-          </div>
+        {/* Tab Content */}
+        <div className="flex-grow flex flex-col">
+          {activeTab === 'main' && (
+            <MainTab
+              isListening={isListening}
+              transcription={transcription}
+              showTranscription={showTranscription}
+              toggleListening={toggleListening}
+            />
+          )}
+          
+          {activeTab === 'settings' && (
+            <SettingsTab
+              settings={settings}
+              onSave={saveSettings}
+            />
+          )}
+          
+          {activeTab === 'devices' && (
+            <DevicesTab
+              selectedDeviceId={settings.deviceId}
+              onDeviceSelect={(deviceId) => {
+                const newSettings = { ...settings, deviceId };
+                saveSettings(newSettings);
+              }}
+            />
+          )}
+          
+          {activeTab === 'help' && (
+            <HelpTab />
+          )}
         </div>
         
         {/* Status text (small and subtle) */}
@@ -300,14 +313,7 @@ const App: React.FC = () => {
         </div>
       </div>
       
-      {/* Settings panel */}
-      {showSettings && (
-        <SettingsPanel 
-          settings={settings} 
-          onSave={saveSettings} 
-          onClose={() => setShowSettings(false)} 
-        />
-      )}
+      {/* We no longer need the modal settings panel as it's now a tab */}
     </div>
   );
 };
