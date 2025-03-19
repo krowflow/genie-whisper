@@ -242,6 +242,14 @@ const App: React.FC = () => {
       
       {/* Main content */}
       <div className="flex-grow flex flex-col p-4">
+        {/* App Title */}
+        <div className="text-center mb-4">
+          <h1 className="text-2xl font-bold bg-gradient-to-r from-cyan-400 to-blue-500 text-transparent bg-clip-text">
+            Genie Whisper
+          </h1>
+          <p className="text-xs text-gray-400">Your Voice-to-Text Assistant</p>
+        </div>
+        
         {/* Transcription preview (only shown when there's transcription) */}
         {showTranscription && transcription && (
           <div className="w-full mb-4">
