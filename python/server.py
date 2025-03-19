@@ -33,6 +33,17 @@ except ImportError as e:
     logger.error("Please install required packages: pip install -r requirements.txt")
     sys.exit(1)
 
+# Import local modules
+try:
+    from vad import create_vad
+    from wake_word import create_wake_word_detector
+    from ide_integration import inject_text
+except ImportError as e:
+    logger.error(f"Failed to import local modules: {e}")
+    logger.error("Make sure vad.py, wake_word.py, and ide_integration.py are in the same directory")
+    # Continue without these modules, they will be handled gracefully
+
+
 class AudioProcessor:
     """Handles audio capture and processing."""
     
@@ -48,6 +59,14 @@ class AudioProcessor:
         self.audio_buffer = []
         self.is_recording = False
         self.recording_thread = None
+        
+        # Initialize VAD if available
+        try:
+            self.vad = create_vad("silero", threshold=0.5)
+            logger.info("VAD initialized")
+        except Exception as e:
+            logger.error(f"Error initializing VAD: {e}")
+            self.vad = None
         
     def start_recording(self) -> None:
         """Start recording audio from the microphone."""
@@ -120,8 +139,29 @@ class AudioProcessor:
         # Add audio chunk to buffer
         self.audio_buffer.append(indata.copy())
         
-        # Process audio (VAD, etc.) could be added here
+        # Process audio with VAD if available
+        if self.vad:
+            # Check if the chunk contains speech
+            is_speech = self.vad.is_speech(indata.squeeze())
+            
+            # Log speech detection (debug only)
+            if is_speech:
+                logger.debug("Speech detected in audio chunk")
+    
+    def filter_audio(self, audio: np.ndarray) -> np.ndarray:
+        """Filter audio using VAD to keep only speech segments.
         
+        Args:
+            audio: Numpy array of audio samples
+            
+        Returns:
+            Filtered audio with only speech segments
+        """
+        if self.vad:
+            return self.vad.filter_audio(audio)
+        else:
+            return audio
+    
     def get_audio_devices(self) -> List[Dict[str, str]]:
         """Get a list of available audio input devices.
         
@@ -247,13 +287,33 @@ class GenieWhisperServer:
         self.sensitivity = args.sensitivity
         self.use_vad = args.vad
         self.offline_mode = args.offline
+        self.wake_word = args.wake_word
+        self.activation_mode = args.activation_mode
+        self.ide = args.ide
         
         # Initialize components
         self.audio_processor = AudioProcessor()
         self.transcriber = WhisperTranscriber(model_size=self.model_size)
         
+        # Initialize wake word detector if needed
+        if self.activation_mode == "wake_word":
+            try:
+                self.wake_word_detector = create_wake_word_detector(
+                    "whisper",
+                    wake_word=self.wake_word,
+                    threshold=self.sensitivity
+                )
+                logger.info(f"Wake word detector initialized with wake word: {self.wake_word}")
+            except Exception as e:
+                logger.error(f"Error initializing wake word detector: {e}")
+                self.wake_word_detector = None
+                self.activation_mode = "manual"  # Fallback to manual mode
+        else:
+            self.wake_word_detector = None
+        
         # State
         self.is_listening = False
+        self.wake_word_active = False
     
     def start(self) -> None:
         """Start the server."""
@@ -264,6 +324,10 @@ class GenieWhisperServer:
             "type": "status",
             "status": "Server started"
         })
+        
+        # Start wake word detection if needed
+        if self.activation_mode == "wake_word" and self.wake_word_detector:
+            self._start_wake_word_detection()
         
         # Main loop
         try:
@@ -320,6 +384,8 @@ class GenieWhisperServer:
             self._get_audio_devices()
         elif cmd_type == "update_settings":
             self._update_settings(command.get("settings", {}))
+        elif cmd_type == "inject_text":
+            self._inject_text(command.get("text", ""), command.get("ide"))
         else:
             logger.warning(f"Unknown command: {cmd_type}")
     
@@ -354,6 +420,10 @@ class GenieWhisperServer:
         # Stop recording and get final audio
         audio = self.audio_processor.stop_recording()
         
+        # Filter audio with VAD if enabled
+        if self.use_vad:
+            audio = self.audio_processor.filter_audio(audio)
+        
         # Transcribe final audio
         if len(audio) > 0:
             text = self.transcriber.transcribe(audio)
@@ -364,12 +434,20 @@ class GenieWhisperServer:
                     "text": text,
                     "final": True
                 })
+                
+                # Inject text into IDE if specified
+                if self.ide:
+                    self._inject_text(text, self.ide)
     
     def _transcription_loop(self) -> None:
         """Continuously transcribe audio while listening."""
         while self.is_listening:
             # Get current audio buffer (copy)
             audio = np.concatenate(self.audio_processor.audio_buffer) if self.audio_processor.audio_buffer else np.array([])
+            
+            # Filter audio with VAD if enabled
+            if self.use_vad and len(audio) > 0:
+                audio = self.audio_processor.filter_audio(audio)
             
             # Transcribe if we have enough audio
             if len(audio) > 0:
@@ -384,6 +462,46 @@ class GenieWhisperServer:
             
             # Sleep to avoid excessive CPU usage
             time.sleep(1.0)
+    
+    def _start_wake_word_detection(self) -> None:
+        """Start wake word detection."""
+        if not self.wake_word_detector:
+            logger.error("Wake word detector not initialized")
+            return
+        
+        if self.wake_word_active:
+            logger.warning("Wake word detection already active")
+            return
+        
+        self.wake_word_active = True
+        
+        # Define callback for wake word detection
+        def wake_word_callback(audio):
+            logger.info("Wake word detected")
+            
+            # Send message to frontend
+            self._send_message({
+                "type": "wake_word_detected",
+                "wake_word": self.wake_word
+            })
+            
+            # Start listening
+            self._start_listening()
+        
+        # Start wake word detection
+        self.wake_word_detector.start_listening(wake_word_callback)
+        
+        logger.info("Wake word detection started")
+    
+    def _stop_wake_word_detection(self) -> None:
+        """Stop wake word detection."""
+        if not self.wake_word_detector or not self.wake_word_active:
+            return
+        
+        self.wake_word_active = False
+        self.wake_word_detector.stop_listening()
+        
+        logger.info("Wake word detection stopped")
     
     def _get_audio_devices(self) -> None:
         """Get available audio devices."""
@@ -411,10 +529,65 @@ class GenieWhisperServer:
         if "offlineMode" in settings:
             self.offline_mode = settings["offlineMode"]
         
+        if "wakeWord" in settings and settings["wakeWord"] != self.wake_word:
+            self.wake_word = settings["wakeWord"]
+            
+            # Restart wake word detection if active
+            if self.wake_word_active:
+                self._stop_wake_word_detection()
+                
+                # Recreate wake word detector
+                self.wake_word_detector = create_wake_word_detector(
+                    "whisper",
+                    wake_word=self.wake_word,
+                    threshold=self.sensitivity
+                )
+                
+                self._start_wake_word_detection()
+        
+        if "activationMode" in settings and settings["activationMode"] != self.activation_mode:
+            self.activation_mode = settings["activationMode"]
+            
+            # Start or stop wake word detection based on mode
+            if self.activation_mode == "wake_word":
+                if not self.wake_word_active and self.wake_word_detector:
+                    self._start_wake_word_detection()
+            else:
+                if self.wake_word_active:
+                    self._stop_wake_word_detection()
+        
+        if "ide" in settings:
+            self.ide = settings["ide"]
+        
         self._send_message({
             "type": "status",
             "status": "Settings updated"
         })
+    
+    def _inject_text(self, text: str, ide: Optional[str] = None) -> None:
+        """Inject text into IDE.
+        
+        Args:
+            text: Text to inject
+            ide: IDE to inject into (None for auto-detection)
+        """
+        try:
+            # Use IDE integration module
+            result = inject_text(text, ide or self.ide)
+            
+            self._send_message({
+                "type": "text_injected",
+                "success": result
+            })
+            
+        except Exception as e:
+            logger.error(f"Error injecting text: {e}")
+            
+            self._send_message({
+                "type": "text_injected",
+                "success": False,
+                "error": str(e)
+            })
     
     def _send_message(self, message: Dict) -> None:
         """Send a message to the frontend."""
@@ -431,6 +604,10 @@ class GenieWhisperServer:
         if self.is_listening:
             self.audio_processor.stop_recording()
             self.is_listening = False
+        
+        # Stop wake word detection if active
+        if self.wake_word_active:
+            self._stop_wake_word_detection()
 
 
 def parse_args():
@@ -464,6 +641,28 @@ def parse_args():
         type=lambda x: x.lower() == "true",
         default=True,
         help="Use offline mode"
+    )
+    
+    parser.add_argument(
+        "--wake-word",
+        type=str,
+        default="Hey Genie",
+        help="Wake word for activation"
+    )
+    
+    parser.add_argument(
+        "--activation-mode",
+        type=str,
+        default="manual",
+        choices=["manual", "wake_word", "always_on"],
+        help="Activation mode"
+    )
+    
+    parser.add_argument(
+        "--ide",
+        type=str,
+        default=None,
+        help="IDE to inject text into (vscode, cursor, roocode, openai, or none for auto-detection)"
     )
     
     return parser.parse_args()

@@ -24,6 +24,8 @@ const defaultSettings = {
   sensitivity: 0.5,
   useVAD: true,
   offlineMode: true,
+  activationMode: 'manual', // 'manual', 'wake_word', or 'always_on'
+  ide: '', // '', 'vscode', 'cursor', 'roocode', or 'openai'
 };
 
 // Ensure settings exist
@@ -96,30 +98,59 @@ function createTray() {
 
 // Start the Python backend
 function startPythonBackend() {
+  const settings = store.get('settings');
+  
   const options = {
     mode: 'text',
     pythonPath: 'python', // Adjust based on environment
     pythonOptions: ['-u'], // Unbuffered output
     scriptPath: path.join(__dirname, '../python'),
     args: [
-      '--model-size', store.get('settings.modelSize', 'base'),
-      '--sensitivity', store.get('settings.sensitivity', 0.5).toString(),
-      '--vad', store.get('settings.useVAD', true) ? 'true' : 'false',
-      '--offline', store.get('settings.offlineMode', true) ? 'true' : 'false',
+      '--model-size', settings.modelSize || 'base',
+      '--sensitivity', (settings.sensitivity || 0.5).toString(),
+      '--vad', settings.useVAD ? 'true' : 'false',
+      '--offline', settings.offlineMode ? 'true' : 'false',
+      '--wake-word', settings.wakeWord || 'Hey Genie',
+      '--activation-mode', settings.activationMode || 'manual',
     ],
   };
+  
+  // Add IDE parameter if specified
+  if (settings.ide) {
+    options.args.push('--ide', settings.ide);
+  }
 
   pythonProcess = new PythonShell('server.py', options);
   
   pythonProcess.on('message', (message) => {
-    // Forward messages to renderer
-    if (mainWindow) {
-      mainWindow.webContents.send('python-message', message);
+    try {
+      // Parse message as JSON
+      const data = JSON.parse(message);
+      
+      // Forward messages to renderer
+      if (mainWindow) {
+        mainWindow.webContents.send('python-message', message);
+        
+        // Handle specific message types
+        if (data.type === 'wake_word_detected') {
+          // Show window when wake word is detected
+          mainWindow.show();
+        }
+      }
+    } catch (error) {
+      console.error('Error parsing Python message:', error);
+      // Forward raw message if parsing fails
+      if (mainWindow) {
+        mainWindow.webContents.send('python-message', message);
+      }
     }
   });
   
   pythonProcess.on('error', (err) => {
     console.error('Python Error:', err);
+    if (mainWindow) {
+      mainWindow.webContents.send('python-error', err.toString());
+    }
   });
   
   pythonProcess.on('close', () => {
@@ -128,8 +159,21 @@ function startPythonBackend() {
   });
 }
 
+// Send command to Python backend
+function sendToPython(command) {
+  if (pythonProcess) {
+    pythonProcess.send(JSON.stringify(command));
+  } else {
+    console.error('Python process not running');
+  }
+}
+
 // Start listening for voice input
 function startListening() {
+  if (pythonProcess) {
+    sendToPython({ type: 'start_listening' });
+  }
+  
   if (mainWindow) {
     mainWindow.webContents.send('start-listening');
   }
@@ -137,6 +181,10 @@ function startListening() {
 
 // Stop listening for voice input
 function stopListening() {
+  if (pythonProcess) {
+    sendToPython({ type: 'stop_listening' });
+  }
+  
   if (mainWindow) {
     mainWindow.webContents.send('stop-listening');
   }
@@ -208,10 +256,12 @@ ipcMain.on('update-settings', (event, settings) => {
     startListening();
   });
   
-  // Restart Python backend with new settings
+  // Update Python backend with new settings
   if (pythonProcess) {
-    pythonProcess.end();
-    startPythonBackend();
+    sendToPython({
+      type: 'update_settings',
+      settings: settings
+    });
   }
 });
 
@@ -225,6 +275,34 @@ ipcMain.on('start-listening', () => {
 
 ipcMain.on('stop-listening', () => {
   stopListening();
+});
+
+ipcMain.on('get-devices', () => {
+  if (pythonProcess) {
+    sendToPython({ type: 'get_devices' });
+  }
+});
+
+ipcMain.on('inject-text', (event, text, ide) => {
+  if (pythonProcess) {
+    sendToPython({
+      type: 'inject_text',
+      text: text,
+      ide: ide
+    });
+  }
+});
+
+ipcMain.on('minimize-window', () => {
+  if (mainWindow) {
+    mainWindow.minimize();
+  }
+});
+
+ipcMain.on('close-window', () => {
+  if (mainWindow) {
+    mainWindow.hide();
+  }
 });
 
 ipcMain.on('quit-app', () => {

@@ -10,6 +10,14 @@ sounddevice>=0.4.6
 silero>=0.4.1
 webrtcvad>=2.0.10
 
+# Wake Word Detection
+pvporcupine>=2.2.0  # Optional: Picovoice Porcupine for wake word detection
+
+# IDE Integration
+pyperclip>=1.8.2    # For clipboard operations
+pywin32>=306; platform_system == "Windows"  # For Windows-specific operations
+pyautogui>=0.9.54   # For cross-platform GUI automation
+
 # API and communication
 fastapi>=0.100.0
 uvicorn>=0.22.0
@@ -21,6 +29,7 @@ python-dotenv>=1.0.0
 pydantic>=2.0.0
 loguru>=0.7.0
 ffmpeg-python>=0.2.0
+onnxruntime>=1.15.0  # For ONNX model support
 
 # Testing
 pytest>=7.3.1
