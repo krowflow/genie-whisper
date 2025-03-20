@@ -301,13 +301,13 @@ class AudioProcessor:
 
 
 class WhisperTranscriber:
-    """Handles transcription using Whisper."""
+    """Handles transcription using Whisper with optimized GPU acceleration."""
     
     # Model size options
     MODEL_SIZES = ["tiny", "base", "small", "medium", "large"]
     
     def __init__(self, model_size: str = "base", device: str = "auto", compute_type: str = "auto"):
-        """Initialize the transcriber.
+        """Initialize the transcriber with optimized settings.
         
         Args:
             model_size: Whisper model size
@@ -320,17 +320,46 @@ class WhisperTranscriber:
         
         self.model_size = model_size
         
-        # Determine device
+        # Determine device with better GPU detection
         if device == "auto":
-            import torch
-            self.device = "cuda" if torch.cuda.is_available() else "cpu"
+            try:
+                import torch
+                if torch.cuda.is_available():
+                    # Check GPU memory
+                    gpu_memory = torch.cuda.get_device_properties(0).total_memory / (1024**3)
+                    logger.info(f"Detected GPU with {gpu_memory:.2f} GB memory")
+                    
+                    # Use CUDA if enough memory is available
+                    if gpu_memory >= 2.0 or self.model_size in ["tiny", "base"]:
+                        self.device = "cuda"
+                        logger.info(f"Using GPU for {self.model_size} model")
+                    else:
+                        self.device = "cpu"
+                        logger.info(f"GPU memory may be insufficient for {self.model_size} model, using CPU")
+                else:
+                    self.device = "cpu"
+                    logger.info("No GPU detected, using CPU")
+            except ImportError:
+                self.device = "cpu"
+                logger.info("PyTorch not available, using CPU")
         else:
             self.device = device
         
-        # Determine compute type
+        # Optimize compute type based on device and available memory
         if compute_type == "auto":
             if self.device == "cuda":
-                self.compute_type = "float16"  # Better for GPU
+                try:
+                    import torch
+                    gpu_memory = torch.cuda.get_device_properties(0).total_memory / (1024**3)
+                    
+                    # Use float16 for better performance on most GPUs
+                    if gpu_memory >= 4.0 or self.model_size in ["tiny", "base", "small"]:
+                        self.compute_type = "float16"  # Faster on GPU
+                    else:
+                        # For very limited memory, use int8
+                        self.compute_type = "int8"
+                except:
+                    self.compute_type = "float16"  # Default for GPU
             else:
                 self.compute_type = "int8"  # Better for CPU
         else:
@@ -338,11 +367,19 @@ class WhisperTranscriber:
         
         self.model = None
         
+        # Cache for repeated phrases to avoid redundant processing
+        self.transcription_cache = {}
+        self.cache_hits = 0
+        
+        # Performance metrics
+        self.total_transcription_time = 0
+        self.transcription_count = 0
+        
         # Load the model
         self._load_model()
     
     def _load_model(self) -> None:
-        """Load the Whisper model."""
+        """Load the Whisper model with optimized settings."""
         logger.info(f"Loading Whisper model: {self.model_size} on {self.device} with {self.compute_type}")
         
         try:
@@ -351,22 +388,39 @@ class WhisperTranscriber:
             if not os.path.exists(models_dir):
                 os.makedirs(models_dir)
             
-            # Load the model
+            # Load the model with optimized settings
             self.model = WhisperModel(
                 model_size_or_path=self.model_size,
                 device=self.device,
                 compute_type=self.compute_type,
-                download_root=models_dir
+                download_root=models_dir,
+                cpu_threads=8,  # Optimize CPU threading
+                num_workers=2   # Optimize data loading
             )
             
-            logger.info("Model loaded successfully")
+            # Optimize CUDA settings if using GPU
+            if self.device == "cuda":
+                try:
+                    import torch
+                    # Set CUDA optimization flags
+                    torch.backends.cudnn.benchmark = True
+                    torch.backends.cudnn.deterministic = False
+                    
+                    # Log GPU info
+                    logger.info(f"Using GPU: {torch.cuda.get_device_name(0)}")
+                    logger.info(f"CUDA version: {torch.version.cuda}")
+                    logger.info(f"GPU memory: {torch.cuda.get_device_properties(0).total_memory / (1024**3):.2f} GB")
+                except:
+                    logger.warning("Failed to set CUDA optimization flags")
+            
+            logger.info("Model loaded successfully with optimized settings")
             
         except Exception as e:
             logger.error(f"Error loading Whisper model: {e}")
             self.model = None
     
     def transcribe(self, audio: np.ndarray, language: Optional[str] = None) -> str:
-        """Transcribe audio using Whisper.
+        """Transcribe audio using Whisper with optimized parameters.
         
         Args:
             audio: Numpy array of audio samples
@@ -384,25 +438,74 @@ class WhisperTranscriber:
             return ""
         
         try:
-            logger.info("Transcribing audio...")
+            # Check cache for similar audio (simple hash-based caching)
+            audio_hash = hash(audio.tobytes())
+            if audio_hash in self.transcription_cache:
+                self.cache_hits += 1
+                logger.info(f"Using cached transcription (hits: {self.cache_hits})")
+                return self.transcription_cache[audio_hash]
             
-            # Transcribe audio
+            logger.info("Transcribing audio...")
+            start_time = time.time()
+            
+            # Optimize transcription parameters based on device
+            beam_size = 3 if self.device == "cuda" else 1  # Smaller beam size for faster processing
+            
+            # Transcribe audio with optimized parameters
             segments, info = self.model.transcribe(
                 audio,
                 language=language,
-                beam_size=5,
-                vad_filter=True
+                beam_size=beam_size,
+                vad_filter=True,
+                vad_parameters={"threshold": 0.5},  # Optimize VAD for speed
+                condition_on_previous_text=False,   # Faster processing
+                compression_ratio_threshold=2.4,    # Optimize for speed
+                log_prob_threshold=-1.0,            # Optimize for speed
+                no_speech_threshold=0.6             # Optimize for speed
             )
             
             # Combine segments
             text = " ".join(segment.text for segment in segments)
             
+            # Update performance metrics
+            end_time = time.time()
+            transcription_time = end_time - start_time
+            self.total_transcription_time += transcription_time
+            self.transcription_count += 1
+            avg_time = self.total_transcription_time / self.transcription_count
+            
+            # Cache the result
+            self.transcription_cache[audio_hash] = text
+            
+            # Limit cache size to prevent memory issues
+            if len(self.transcription_cache) > 100:
+                # Remove oldest entries
+                for _ in range(10):
+                    self.transcription_cache.pop(next(iter(self.transcription_cache)))
+            
             logger.info(f"Transcription complete: {text}")
+            logger.info(f"Transcription time: {transcription_time:.2f}s (avg: {avg_time:.2f}s)")
             return text
             
         except Exception as e:
             logger.error(f"Error transcribing audio: {e}")
             return ""
+    
+    def get_performance_stats(self) -> Dict:
+        """Get performance statistics for the transcriber.
+        
+        Returns:
+            Dictionary with performance statistics
+        """
+        return {
+            "model_size": self.model_size,
+            "device": self.device,
+            "compute_type": self.compute_type,
+            "avg_transcription_time": self.total_transcription_time / max(1, self.transcription_count),
+            "transcription_count": self.transcription_count,
+            "cache_hits": self.cache_hits,
+            "cache_size": len(self.transcription_cache)
+        }
 
 
 class GenieWhisperServer:
@@ -577,8 +680,32 @@ class GenieWhisperServer:
             self._update_settings(command.get("settings", {}))
         elif cmd_type == "inject_text":
             self._inject_text(command.get("text", ""), command.get("ide"))
+        elif cmd_type == "get_performance":
+            self._get_performance_stats()
         else:
             logger.warning(f"Unknown command: {cmd_type}")
+    
+    def _get_performance_stats(self) -> None:
+        """Get performance statistics."""
+        # Get transcriber performance stats
+        stats = self.transcriber.get_performance_stats()
+        
+        # Add GPU information if available
+        try:
+            import torch
+            if torch.cuda.is_available():
+                stats["gpu_name"] = torch.cuda.get_device_name(0)
+                stats["gpu_memory_total"] = torch.cuda.get_device_properties(0).total_memory / (1024**3)
+                stats["gpu_memory_allocated"] = torch.cuda.memory_allocated(0) / (1024**3)
+                stats["gpu_memory_reserved"] = torch.cuda.memory_reserved(0) / (1024**3)
+        except:
+            pass
+        
+        # Send performance stats to frontend
+        self._send_message({
+            "type": "performance_stats",
+            "stats": stats
+        })
     
     def _start_listening(self) -> None:
         """Start listening for speech."""
@@ -643,13 +770,36 @@ class GenieWhisperServer:
                     self._inject_text(text, self.ide)
     
     def _transcription_loop(self) -> None:
-        """Continuously transcribe audio while listening."""
+        """Continuously transcribe audio while listening with optimized performance."""
+        # Adaptive sleep time based on device
+        sleep_time = 0.5 if self.device == "cuda" else 1.0
+        
+        # Minimum audio length for transcription (to avoid processing very short segments)
+        min_audio_length = 0.5 * self.audio_processor.sample_rate
+        
+        # Last transcription time for adaptive processing
+        last_transcription_time = time.time()
+        
+        # Performance tracking
+        transcription_times = []
+        
         while self.is_listening:
+            start_time = time.time()
+            
             # Get current audio buffer (copy)
-            audio = np.concatenate(self.audio_processor.audio_buffer) if self.audio_processor.audio_buffer else np.array([])
+            if not self.audio_processor.audio_buffer:
+                time.sleep(sleep_time)
+                continue
+                
+            audio = np.concatenate(self.audio_processor.audio_buffer)
+            
+            # Skip if audio is too short
+            if len(audio) < min_audio_length:
+                time.sleep(sleep_time)
+                continue
             
             # Filter audio with VAD if enabled
-            if self.use_vad and len(audio) > 0:
+            if self.use_vad:
                 # Use enhanced VAD filtering
                 filtered_audio = self.audio_processor.filter_audio(audio)
                 
@@ -659,22 +809,48 @@ class GenieWhisperServer:
                 else:
                     # No speech detected, skip transcription
                     logger.debug("No speech detected in current buffer, skipping transcription")
-                    time.sleep(1.0)
+                    time.sleep(sleep_time)
                     continue
             
-            # Transcribe if we have enough audio
-            if len(audio) > 0:
-                text = self.transcriber.transcribe(audio)
-                
-                if text:
-                    self._send_message({
-                        "type": "transcription",
-                        "text": text,
-                        "final": False
-                    })
+            # Transcribe audio
+            text = self.transcriber.transcribe(audio)
             
-            # Sleep to avoid excessive CPU usage
-            time.sleep(1.0)
+            # Track transcription time
+            transcription_time = time.time() - start_time
+            transcription_times.append(transcription_time)
+            
+            # Keep only the last 10 times for adaptive sleep
+            if len(transcription_times) > 10:
+                transcription_times.pop(0)
+            
+            # Calculate average transcription time
+            avg_time = sum(transcription_times) / len(transcription_times)
+            
+            # Adjust sleep time based on transcription performance
+            if avg_time < 0.5:
+                # Fast transcription, can process more frequently
+                sleep_time = max(0.2, sleep_time * 0.9)
+            else:
+                # Slow transcription, reduce frequency
+                sleep_time = min(1.5, sleep_time * 1.1)
+            
+            # Send transcription result
+            if text:
+                self._send_message({
+                    "type": "transcription",
+                    "text": text,
+                    "final": False,
+                    "performance": {
+                        "transcription_time": transcription_time,
+                        "avg_time": avg_time
+                    }
+                })
+                
+                # Log performance
+                logger.debug(f"Transcription time: {transcription_time:.2f}s, avg: {avg_time:.2f}s, sleep: {sleep_time:.2f}s")
+            
+            # Adaptive sleep based on performance
+            time.sleep(sleep_time)
     
     def _start_wake_word_detection(self) -> None:
         """Start wake word detection."""
