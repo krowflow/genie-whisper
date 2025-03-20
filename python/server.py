@@ -23,15 +23,107 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Try to import required packages
+# Import auto recovery module for automatic dependency verification and fixing
 try:
-    import numpy as np
-    import sounddevice as sd
-    from faster_whisper import WhisperModel
-except ImportError as e:
-    logger.error(f"Failed to import required packages: {e}")
-    logger.error("Please install required packages: pip install -r requirements.txt")
-    sys.exit(1)
+    from auto_recovery import auto_verify_dependencies
+    
+    # Automatically verify and fix dependencies without user intervention
+    logger.info("Starting automatic dependency verification and recovery...")
+    dependency_check_result = auto_verify_dependencies()
+    
+    if dependency_check_result:
+        logger.info("Automatic dependency verification and recovery completed successfully")
+    else:
+        logger.warning("Automatic dependency recovery completed with some issues")
+        logger.warning("The application will continue with available dependencies")
+        logger.warning("Some features may not work correctly")
+except ImportError:
+    logger.warning("Auto recovery module not found, falling back to basic dependency verification")
+    
+    # Define a fallback verify_dependencies function
+    def verify_dependencies():
+        """Verify that all required dependencies are installed and working correctly.
+        
+        Returns:
+            bool: True if all dependencies are installed and working, False otherwise.
+        """
+        logger.info("Verifying dependencies...")
+        missing_packages = []
+        
+        # Core dependencies
+        core_packages = ["numpy", "sounddevice", "faster_whisper"]
+        for package in core_packages:
+            try:
+                __import__(package)
+            except ImportError:
+                missing_packages.append(package)
+        
+        if missing_packages:
+            logger.error(f"Missing core dependencies: {', '.join(missing_packages)}")
+            logger.error("The application will continue with available dependencies")
+            return False
+        
+        # PyTorch and torchaudio
+        try:
+            import torch
+            import torchaudio
+            logger.info(f"PyTorch version: {torch.__version__}")
+            logger.info(f"torchaudio version: {torchaudio.__version__}")
+            
+            # Test basic functionality
+            sample_rate = 16000
+            waveform = torch.zeros([1, sample_rate])
+            logger.info("PyTorch and torchaudio are working correctly")
+            
+            # Check CUDA availability
+            if torch.cuda.is_available():
+                logger.info(f"CUDA is available: {torch.cuda.get_device_name(0)}")
+                logger.info(f"CUDA version: {torch.version.cuda}")
+            else:
+                logger.info("CUDA is not available, using CPU")
+        except ImportError as e:
+            logger.error(f"PyTorch or torchaudio not installed: {e}")
+            logger.error("The application will continue with available dependencies")
+            return False
+        except Exception as e:
+            logger.error(f"Error testing PyTorch/torchaudio: {e}")
+            logger.error("PyTorch or torchaudio may not be functioning correctly")
+            return False
+        
+        # Import local modules
+        local_modules = {
+            "vad": "create_vad",
+            "wake_word": "create_wake_word_detector",
+            "ide_integration": "inject_text"
+        }
+        
+        missing_local_modules = []
+        for module, function in local_modules.items():
+            try:
+                module_obj = __import__(module)
+                if not hasattr(module_obj, function):
+                    missing_local_modules.append(f"{module}.{function}")
+            except ImportError:
+                missing_local_modules.append(module)
+        
+        if missing_local_modules:
+            logger.error(f"Missing local modules or functions: {', '.join(missing_local_modules)}")
+            logger.error("Make sure vad.py, wake_word.py, and ide_integration.py are in the same directory")
+            # Continue without these modules, they will be handled gracefully
+        
+        logger.info("All core dependencies verified successfully")
+        return True
+    
+    # Verify dependencies
+    dependency_check_result = verify_dependencies()
+    if not dependency_check_result:
+        logger.error("Dependency verification failed. Some features may not work correctly.")
+        # Continue with available dependencies, will handle gracefully
+
+# Import required packages
+import numpy as np
+import sounddevice as sd
+from faster_whisper import WhisperModel
 
 # Import local modules
 try:
