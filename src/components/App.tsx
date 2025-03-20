@@ -15,6 +15,11 @@ interface Settings {
   sensitivity: number;
   useVAD: boolean;
   offlineMode: boolean;
+  activationMode: 'manual' | 'wake_word' | 'always_on';
+  ide: string;
+  deviceId?: number;
+  useGPU: boolean;
+  computeType: 'auto' | 'int8' | 'float16' | 'float32';
 }
 
 const defaultSettings: Settings = {
@@ -28,6 +33,10 @@ const defaultSettings: Settings = {
   sensitivity: 0.5,
   useVAD: true,
   offlineMode: true,
+  activationMode: 'manual',
+  ide: '',
+  useGPU: true,
+  computeType: 'auto'
 };
 
 const App: React.FC = () => {
@@ -62,6 +71,11 @@ const App: React.FC = () => {
       });
 
       window.api.receive('python-message', handlePythonMessage);
+      
+      window.api.receive('wake-word-detected', () => {
+        // Show window when wake word is detected
+        setStatus('Wake word detected');
+      });
     }
 
     // Clean up event listeners
@@ -83,6 +97,8 @@ const App: React.FC = () => {
         handleError(data.error);
       } else if (data.type === 'status') {
         setStatus(data.status);
+      } else if (data.type === 'wake_word_detected') {
+        setStatus(`Wake word detected: ${data.wake_word}`);
       }
     } catch (error) {
       console.error('Error parsing Python message:', error);
