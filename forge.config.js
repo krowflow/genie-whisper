@@ -1,7 +1,7 @@
 module.exports = {
   packagerConfig: {
     asar: true,
-    icon: './images/genie_without_background',
+    icon: './images/Genie',
     extraResource: [
       './models'
     ],
@@ -24,8 +24,8 @@ module.exports = {
       name: '@electron-forge/maker-squirrel',
       config: {
         name: 'genie-whisper',
-        iconUrl: 'https://raw.githubusercontent.com/user/genie-whisper/main/images/genie_without_background.ico',
-        setupIcon: './images/genie_without_background.ico',
+        iconUrl: 'https://raw.githubusercontent.com/user/genie-whisper/main/images/Genie.png',
+        setupIcon: './images/Genie.png',
       },
     },
     {
@@ -36,7 +36,7 @@ module.exports = {
       name: '@electron-forge/maker-deb',
       config: {
         options: {
-          icon: './images/genie_without_background.png',
+          icon: './images/Genie.png',
         },
       },
     },
@@ -44,7 +44,7 @@ module.exports = {
       name: '@electron-forge/maker-rpm',
       config: {
         options: {
-          icon: './images/genie_without_background.png',
+          icon: './images/Genie.png',
         },
       },
     },
