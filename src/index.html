@@ -568,8 +568,22 @@
           if (window.api) {
             window.api.send("close-window");
           } else {
-            // For development without Electron
-            alert("Close button clicked (would close the app in production)");
+            // For development without Electron, simulate window closing
+            const root = document.getElementById("root");
+            if (root) {
+              // Create a simple animation to simulate closing
+              root.style.transition = "opacity 0.3s ease-out";
+              root.style.opacity = "0";
+              
+              setTimeout(() => {
+                // Reset after animation
+                root.style.opacity = "1";
+                document.getElementById("status").textContent = "Window would be hidden in production";
+                setTimeout(() => {
+                  document.getElementById("status").textContent = "Ready";
+                }, 2000);
+              }, 300);
+            }
           }
         });
 
@@ -580,8 +594,24 @@
             if (window.api) {
               window.api.send("minimize-window");
             } else {
-              // For development without Electron
-              alert("Minimize button clicked (would minimize the app in production)");
+              // For development without Electron, simulate window minimizing
+              const root = document.getElementById("root");
+              if (root) {
+                // Create a simple animation to simulate minimizing
+                root.style.transition = "transform 0.3s ease-out, opacity 0.3s ease-out";
+                root.style.transform = "scale(0.8)";
+                root.style.opacity = "0.5";
+                
+                setTimeout(() => {
+                  // Reset after animation
+                  root.style.transform = "scale(1)";
+                  root.style.opacity = "1";
+                  document.getElementById("status").textContent = "Window would be minimized in production";
+                  setTimeout(() => {
+                    document.getElementById("status").textContent = "Ready";
+                  }, 2000);
+                }, 300);
+              }
             }
           });
 
