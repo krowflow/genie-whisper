@@ -45,6 +45,8 @@ We are currently in the **Backend Implementation and Integration phase** for Gen
 | 2025-03-19 | Git Repository | Set up Git repository with proper branching strategy |
 | 2025-03-19 | Tabbed Interface | Implemented tabbed interface with Main, Settings, Devices, and Help tabs |
 | 2025-03-19 | UI Enhancements | Added scrollable tabs, keyboard shortcuts, and improved button functionality |
+| 2025-03-19 | Genie Image Update | Updated Genie image with transparent background and improved animations |
+| 2025-03-19 | Tray Icon Fix | Fixed tray icon path in main.js to use the correct Genie image |
 
 ## Next Steps
 
