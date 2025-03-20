@@ -6,16 +6,20 @@ const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld(
   'api', {
     // Send messages to main process
-    send: (channel, data) => {
+    send: (channel, ...args) => {
       // Whitelist channels
       const validChannels = [
         'update-settings',
         'start-listening',
         'stop-listening',
+        'get-devices',
+        'inject-text',
+        'minimize-window',
+        'close-window',
         'quit-app'
       ];
       if (validChannels.includes(channel)) {
-        ipcRenderer.send(channel, data);
+        ipcRenderer.send(channel, ...args);
       }
     },
     
@@ -23,9 +27,11 @@ contextBridge.exposeInMainWorld(
     receive: (channel, func) => {
       const validChannels = [
         'python-message',
+        'python-error',
         'start-listening',
         'stop-listening',
-        'show-settings'
+        'show-settings',
+        'wake-word-detected'
       ];
       if (validChannels.includes(channel)) {
         // Deliberately strip event as it includes `sender` 
@@ -40,6 +46,21 @@ contextBridge.exposeInMainWorld(
         return ipcRenderer.sendSync(channel);
       }
       return null;
+    },
+    
+    // Remove listeners
+    removeAllListeners: (channel) => {
+      const validChannels = [
+        'python-message',
+        'python-error',
+        'start-listening',
+        'stop-listening',
+        'show-settings',
+        'wake-word-detected'
+      ];
+      if (validChannels.includes(channel)) {
+        ipcRenderer.removeAllListeners(channel);
+      }
     }
   }
 );
@@ -49,4 +70,13 @@ contextBridge.exposeInMainWorld('versions', {
   node: () => process.versions.node,
   chrome: () => process.versions.chrome,
   electron: () => process.versions.electron,
+});
+
+// Expose platform information
+contextBridge.exposeInMainWorld('platform', {
+  os: process.platform,
+  arch: process.arch,
+  isWindows: process.platform === 'win32',
+  isMac: process.platform === 'darwin',
+  isLinux: process.platform === 'linux',
 });

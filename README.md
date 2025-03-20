@@ -1,118 +1,146 @@
 # Genie Whisper
 
-A real-time voice-to-text transcription tool designed for developers, integrating seamlessly with Cursor, VS Code, Roo Code, and Cline Dev.
+A real-time voice-to-text transcription tool designed to work offline and online, integrating seamlessly with Cursor, VS Code, Roo Code, and Cline Dev.
 
 ![Genie Whisper](images/genie_without_background.png)
 
 ## Features
 
-- **Real-Time Speech-to-Text**: Convert voice input into text using OpenAI Whisper
-- **Offline & Online Mode**: Run locally with optional cloud-based fallback
-- **Global UI Overlay**: Toggleable UI overlay that works across multiple IDEs
-- **Intelligent Speech Filtering**: Voice Activity Detection (VAD) to ignore background noise
-- **Live Waveform Visualization**: Real-time audio visualization
-- **Animated Genie Avatar**: Dynamic avatar that responds to your voice
-- **Multiple Activation Methods**: Push-to-talk, wake word, or always-on transcription
-- **Direct IDE Integration**: Seamless text injection into supported IDEs
-- **Minimal Latency**: Fast transcription with lightweight models
-
-## System Requirements
-
-- **OS**: Windows 10/11, macOS 12+, or Ubuntu 20.04+
-- **CPU**: 4+ cores recommended
-- **RAM**: 8GB minimum, 16GB recommended
-- **Storage**: 2GB for application and models
-- **Microphone**: Any system-compatible microphone
+- **Real-Time Speech-to-Text**: Converts voice input into text using OpenAI Whisper
+- **Offline & Online Mode**: Runs locally, with optional cloud-based fallback
+- **Global UI Overlay**: Toggleable UI overlay that works across PC, Cursor, VS Code IDEs
+- **Intelligent Speech Filtering**: Uses Voice Activity Detection (VAD) to ignore background noise
+- **Live Waveform Visualization**: Displays real-time waveform during speech
+- **Animated Genie Avatar**: A dynamic avatar that "speaks" transcribed text
+- **Hotkey & Wake Word Activation**: Allows push-to-talk, wake-word mode, or always-on transcription
+- **Direct IDE Integration**: Seamlessly injects text into Cursor, VS Code, Roo Code, and OpenAI chat UI
+- **Minimal Latency**: Optimized for fast transcription with lightweight models
+- **System Tray & Toggle Control**: UI settings panel to enable/disable transcription and configure settings
 
 ## Installation
 
 ### Prerequisites
 
-- Node.js v18.0.0 or higher
-- Python 3.9 or higher
-- Git
-- FFmpeg
+- Node.js (for Electron)
+- Python 3.9+ (for Whisper backend)
+- FFmpeg (for audio processing)
 
 ### Setup
 
 1. Clone the repository:
-   ```
-   git clone https://github.com/user/genie-whisper
+   ```bash
+   git clone https://github.com/krowflow/genie-whisper.git
    cd genie-whisper
    ```
 
-2. Install Node.js dependencies:
-   ```
+2. Install dependencies:
+   ```bash
    npm install
-   ```
-
-3. Set up Python environment:
-   ```
-   # Create a virtual environment (recommended)
-   python -m venv venv
-   
-   # Activate the virtual environment
-   # On Windows:
-   venv\Scripts\activate
-   # On macOS/Linux:
-   source venv/bin/activate
-   
-   # Install Python dependencies
    pip install -r requirements.txt
    ```
 
-4. Download Whisper models:
-   ```
-   python scripts/download_models.py
-   ```
-
-5. Start the application:
-   ```
-   npm run dev
+3. Download models:
+   ```bash
+   npm run download-models
    ```
 
-## Development
+## Usage
 
-### Project Structure
+### Starting the Application
 
-- `/electron` - Electron main process code
-- `/src` - Frontend React components and logic
-- `/python` - Python backend for Whisper and audio processing
-- `/models` - Pre-downloaded Whisper models
-- `/extensions` - IDE extensions for VS Code, Cursor, etc.
-- `/scripts` - Build and utility scripts
-- `/docs` - Project documentation
-- `/memory-bank` - Roo Code memory bank files
+```bash
+npm start
+```
 
-### Available Scripts
+This will launch the Electron application and start the Python backend.
 
-- `npm run dev` - Start the application in development mode
-- `npm run lint` - Run ESLint to check code quality
-- `npm run test` - Run Jest tests
-- `npm run package` - Package the application
-- `npm run make` - Make distributable packages
+### Development Mode
 
-## IDE Integration
+```bash
+npm run dev
+```
 
-### VS Code
+This will start the application in development mode with hot reloading.
 
-1. Install the Genie Whisper extension from the VS Code marketplace
-2. Configure the extension settings
-3. Use the provided commands or keyboard shortcuts to activate transcription
+### Keyboard Shortcuts
 
-### Cursor, Roo Code, and Cline Dev
+- **CommandOrControl+Shift+Space**: Start/stop listening (default, can be customized)
 
-These IDEs are supported through the global overlay functionality. The application will automatically detect text fields and inject transcribed text at the cursor position.
+### Activation Methods
+
+- **Push-to-Talk**: Hold the hotkey while speaking, release to finalize
+- **Wake Word**: Say "Hey Genie" to start listening, automatic stop on silence
+- **Toggle Mode**: Activate for continuous transcription until manually stopped
+
+### Settings
+
+- **Model Size**: Choose between tiny, base, small, medium, or large Whisper models
+- **Sensitivity**: Adjust the sensitivity of the Voice Activity Detection
+- **Activation Mode**: Select between push-to-talk, wake word, or always-on
+- **IDE Integration**: Choose which IDE to inject text into
+- **Theme**: Select between dark and light themes
+- **Always on Top**: Keep the window on top of other windows
+- **Start Minimized**: Start the application minimized to the system tray
+- **Start with System**: Start the application when the system starts
+
+## Testing
+
+### Audio Capture and Transcription
+
+```bash
+python python/test_audio.py
+```
+
+This will test the audio capture, VAD, wake word detection, and transcription functionality.
+
+### IDE Integration
+
+```bash
+python python/test_ide_integration.py
+```
+
+This will test the IDE integration functionality.
+
+## Building
+
+### Package the Application
+
+```bash
+npm run package
+```
+
+### Create Installers
+
+```bash
+npm run make
+```
+
+## Project Structure
+
+- `/electron`: Electron main process code
+- `/src`: Frontend React components and logic
+- `/python`: Python backend for Whisper and audio processing
+- `/models`: Pre-downloaded Whisper models
+- `/scripts`: Build and utility scripts
+- `/docs`: Project documentation
+- `/memory-bank`: Roo Code memory bank files
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch: `git checkout -b feature/my-feature`
+3. Commit your changes: `git commit -am 'Add my feature'`
+4. Push to the branch: `git push origin feature/my-feature`
+5. Submit a pull request
 
 ## License
 
-MIT
+This project is licensed under the MIT License - see the LICENSE file for details.
 
 ## Acknowledgements
 
-- [OpenAI Whisper](https://github.com/openai/whisper)
-- [Whisper.cpp](https://github.com/ggerganov/whisper.cpp)
-- [Faster-Whisper](https://github.com/guillaumekln/faster-whisper)
-- [Silero VAD](https://github.com/snakers4/silero-vad)
-- [Electron](https://www.electronjs.org/)
-- [React](https://reactjs.org/)
+- [OpenAI Whisper](https://github.com/openai/whisper) for the speech recognition model
+- [Faster Whisper](https://github.com/guillaumekln/faster-whisper) for the optimized Whisper implementation
+- [Silero VAD](https://github.com/snakers4/silero-vad) for Voice Activity Detection
+- [Electron](https://www.electronjs.org/) for the desktop application framework
+- [React](https://reactjs.org/) for the UI components
