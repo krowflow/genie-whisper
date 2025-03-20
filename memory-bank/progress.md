@@ -178,7 +178,13 @@ As the project is in the implementation phase, there are some known issues:
 
 ## Next Immediate Tasks
 
-1. Test audio capture and transcription pipeline
+1. Test audio capture and transcription pipeline (Current Focus)
+   - Created test_microphone.py to test microphone input
+   - Created test_transcription.py to test the full audio pipeline
+   - Fixed transcription preview display in the UI
+   - Configured default audio device (Focusrite Clarett 4 Pre)
+   - Implemented enhanced hybrid VAD using both Silero and WebRTC for better noise filtering
+   - Added improved speech detection logic to reduce false negatives
 2. Implement advanced Genie animations with lip-sync
 3. Optimize performance for real-time transcription
 4. Add more visual feedback for user actions

@@ -62,13 +62,34 @@ class AudioProcessor:
         self.is_recording = False
         self.recording_thread = None
         
-        # Initialize VAD if available
+        # Initialize VADs
+        self.silero_vad = None
+        self.webrtc_vad = None
+        self.vad = None
+        
+        # Try to initialize Silero VAD
         try:
-            self.vad = create_vad("silero", threshold=0.5)
-            logger.info("VAD initialized")
+            self.silero_vad = create_vad("silero", threshold=0.5)
+            logger.info("Silero VAD initialized")
         except Exception as e:
-            logger.error(f"Error initializing VAD: {e}")
-            self.vad = None
+            logger.error(f"Error initializing Silero VAD: {e}")
+        
+        # Try to initialize WebRTC VAD
+        try:
+            self.webrtc_vad = create_vad("webrtc", aggressiveness=3)
+            logger.info("WebRTC VAD initialized")
+        except Exception as e:
+            logger.error(f"Error initializing WebRTC VAD: {e}")
+        
+        # Set primary VAD (prefer Silero, fallback to WebRTC)
+        if self.silero_vad:
+            self.vad = self.silero_vad
+            logger.info("Using Silero VAD as primary")
+        elif self.webrtc_vad:
+            self.vad = self.webrtc_vad
+            logger.info("Using WebRTC VAD as primary")
+        else:
+            logger.warning("No VAD available, speech filtering disabled")
         
     def start_recording(self) -> None:
         """Start recording audio from the microphone."""
@@ -142,8 +163,21 @@ class AudioProcessor:
         # Add audio chunk to buffer
         self.audio_buffer.append(indata.copy())
         
-        # Process audio with VAD if available
-        if self.vad:
+        # Enhanced speech detection using both VADs if available
+        if self.silero_vad and self.webrtc_vad:
+            # Check if the chunk contains speech using both VADs
+            silero_speech = self.silero_vad.is_speech(indata.squeeze())
+            webrtc_speech = self.webrtc_vad.is_speech(indata.squeeze())
+            
+            # Consider it speech if either VAD detects speech
+            is_speech = silero_speech or webrtc_speech
+            
+            # Log speech detection (debug only)
+            if is_speech:
+                logger.debug(f"Speech detected in audio chunk (Silero: {silero_speech}, WebRTC: {webrtc_speech})")
+        
+        # Process audio with single VAD if only one is available
+        elif self.vad:
             # Check if the chunk contains speech
             is_speech = self.vad.is_speech(indata.squeeze())
             
@@ -160,7 +194,50 @@ class AudioProcessor:
         Returns:
             Filtered audio with only speech segments
         """
-        if self.vad:
+        # Enhanced filtering using both VADs if available
+        if self.silero_vad and self.webrtc_vad:
+            logger.info("Applying enhanced VAD filtering with both Silero and WebRTC")
+            
+            # Get speech segments from both VADs
+            silero_segments = self.silero_vad.get_speech_segments(audio)
+            webrtc_segments = self.webrtc_vad.get_speech_segments(audio)
+            
+            # Merge segments
+            all_segments = silero_segments + webrtc_segments
+            
+            # Sort segments by start time
+            all_segments.sort(key=lambda x: x[0])
+            
+            # Merge overlapping segments
+            merged_segments = []
+            if all_segments:
+                current_start, current_end = all_segments[0]
+                
+                for start, end in all_segments[1:]:
+                    if start <= current_end:
+                        # Segments overlap, merge them
+                        current_end = max(current_end, end)
+                    else:
+                        # Add current segment
+                        merged_segments.append((current_start, current_end))
+                        
+                        # Start new segment
+                        current_start, current_end = start, end
+                
+                # Add the last segment
+                merged_segments.append((current_start, current_end))
+            
+            # Concatenate speech segments
+            if merged_segments:
+                filtered_audio = np.concatenate([audio[start:end] for start, end in merged_segments])
+                return filtered_audio
+            else:
+                logger.info("No speech detected by enhanced VAD")
+                return np.array([])
+        
+        # Use single VAD if only one is available
+        elif self.vad:
+            logger.info(f"Applying VAD filtering with {type(self.vad).__name__}")
             return self.vad.filter_audio(audio)
         else:
             return audio
@@ -536,7 +613,19 @@ class GenieWhisperServer:
         
         # Filter audio with VAD if enabled
         if self.use_vad:
-            audio = self.audio_processor.filter_audio(audio)
+            filtered_audio = self.audio_processor.filter_audio(audio)
+            
+            # Check if we have any speech after filtering
+            if len(filtered_audio) > 0:
+                audio = filtered_audio
+                logger.info("Speech detected in final audio")
+            else:
+                logger.info("No speech detected in final audio")
+                self._send_message({
+                    "type": "status",
+                    "status": "No speech detected"
+                })
+                return
         
         # Transcribe final audio
         if len(audio) > 0:
@@ -561,7 +650,17 @@ class GenieWhisperServer:
             
             # Filter audio with VAD if enabled
             if self.use_vad and len(audio) > 0:
-                audio = self.audio_processor.filter_audio(audio)
+                # Use enhanced VAD filtering
+                filtered_audio = self.audio_processor.filter_audio(audio)
+                
+                # Check if we have any speech after filtering
+                if len(filtered_audio) > 0:
+                    audio = filtered_audio
+                else:
+                    # No speech detected, skip transcription
+                    logger.debug("No speech detected in current buffer, skipping transcription")
+                    time.sleep(1.0)
+                    continue
             
             # Transcribe if we have enough audio
             if len(audio) > 0:

@@ -47,13 +47,18 @@ We are currently in the **Backend Implementation and Integration phase** for Gen
 | 2025-03-19 | UI Enhancements | Added scrollable tabs, keyboard shortcuts, and improved button functionality |
 | 2025-03-19 | Genie Image Update | Updated Genie image with transparent background and improved animations |
 | 2025-03-19 | Tray Icon Fix | Fixed tray icon path in main.js to use the correct Genie image |
+| 2025-03-20 | Audio Device Configuration | Configured Focusrite Clarett 4 Pre as default audio device |
+| 2025-03-20 | Transcription Preview Fix | Fixed transcription preview display in the UI |
+| 2025-03-20 | Enhanced VAD Implementation | Implemented hybrid VAD approach using both Silero and WebRTC for better noise filtering |
 
 ## Next Steps
 
 ### Immediate Tasks (Next 1-2 Weeks)
 
-1. **Test and refine audio pipeline**
-   - Test audio capture with Focusrite Clarett 4 Pre and Shure SM7B
+1. **Test and refine audio pipeline** (Current Focus)
+   - Test audio capture with test_microphone.py and test_transcription.py
+   - Fix microphone input detection and transcription preview display
+   - Configure Focusrite Clarett 4 Pre as default audio device
    - Optimize VAD for better noise filtering
    - Improve wake word detection accuracy
    - Reduce transcription latency using GPU acceleration
@@ -106,9 +111,9 @@ We are currently in the **Backend Implementation and Integration phase** for Gen
    - **Status**: Implemented model selection, need to test performance with RTX 4090
 
 2. **VAD Implementation**
-   - **Current Decision**: Using both Silero VAD and WebRTC VAD with fallback
+   - **Current Decision**: Using hybrid approach with both Silero VAD and WebRTC VAD for enhanced noise filtering
    - **Considerations**: Accuracy, performance, resource usage
-   - **Status**: Implemented both, need to test with Focusrite Clarett 4 Pre
+   - **Status**: Implemented enhanced hybrid approach, merging speech segments from both VADs for better accuracy
 
 3. **Wake Word Detection**
    - **Current Decision**: Using Whisper for wake word detection, with Porcupine as optional
@@ -121,9 +126,9 @@ We are currently in the **Backend Implementation and Integration phase** for Gen
    - **Status**: Basic implementation complete, need to test with more applications
 
 5. **Audio Device Selection**
-   - **Current Decision**: Added support for selecting specific audio devices
+   - **Current Decision**: Added support for selecting specific audio devices, configured Focusrite Clarett 4 Pre as default
    - **Considerations**: Compatibility with professional audio interfaces
-   - **Status**: Implemented device selection, need to test with Focusrite Clarett 4 Pre
+   - **Status**: Implemented device selection, configured Focusrite as default, tested with success
 
 6. **GPU Acceleration**
    - **Current Decision**: Added support for GPU acceleration with compute type selection
