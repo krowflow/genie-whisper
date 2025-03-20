@@ -125,14 +125,29 @@
               <div class="flex items-center justify-between w-full">
                 <!-- Genie Avatar on left -->
                 <div class="w-1/4 flex justify-center" id="genie-container">
-                  <div class="w-32 h-32 rounded-full bg-indigo-900 flex items-center justify-center overflow-hidden">
-                    <!-- Genie PNG image -->
-                    <div class="flex items-center justify-center w-full h-full">
+                  <div class="w-40 h-40 flex items-center justify-center genie-container">
+                    <style>
+                      @keyframes floatAnimation {
+                        0% { transform: translateY(0px); }
+                        50% { transform: translateY(-5px); }
+                        100% { transform: translateY(0px); }
+                      }
+                      @keyframes glowAnimation {
+                        0% { filter: drop-shadow(0 0 3px rgba(6, 182, 212, 0.4)); }
+                        50% { filter: drop-shadow(0 0 8px rgba(6, 182, 212, 0.7)); }
+                        100% { filter: drop-shadow(0 0 3px rgba(6, 182, 212, 0.4)); }
+                      }
+                      .genie-container img {
+                        animation: floatAnimation 4s ease-in-out infinite, glowAnimation 3s ease-in-out infinite;
+                      }
+                    </style>
+                    <div class="w-40 h-40 relative">
+                      <div class="absolute inset-0 rounded-full bg-indigo-900 opacity-0"></div>
                       <img
-                        src="../images/genie smoke silhouette.png"
-                        alt="Genie Silhouette"
-                        class="w-24 h-24 object-contain"
-                        style="filter: drop-shadow(0 0 5px rgba(6, 182, 212, 0.4));"
+                        src="Genie.png"
+                        alt="Genie"
+                        class="w-full h-full object-contain relative z-10"
+                        style="mix-blend-mode: screen; filter: drop-shadow(0 0 10px rgba(6, 182, 212, 0.7));"
                       />
                     </div>
                   </div>
@@ -446,7 +461,7 @@
         }
 
         // Tab switching functionality
-        const tabButtons = document.querySelectorAll('[data-tab]');
+        const tabButtons = document.querySelectorAll("[data-tab]");
         const tabs = document.querySelectorAll('[id$="-tab"]');
 
         function switchTab(tabId) {
@@ -456,84 +471,97 @@
               console.error("Tab ID is required");
               return;
             }
-            
+
             const targetTab = document.getElementById(`${tabId}-tab`);
             if (!targetTab) {
               console.error(`Tab with ID "${tabId}-tab" not found`);
               return;
             }
-            
+
             // Hide all tabs
-            tabs.forEach(tab => {
-              tab.classList.add('hidden');
-              tab.setAttribute('aria-hidden', 'true');
+            tabs.forEach((tab) => {
+              tab.classList.add("hidden");
+              tab.setAttribute("aria-hidden", "true");
             });
-            
+
             // Show the selected tab
-            targetTab.classList.remove('hidden');
-            targetTab.setAttribute('aria-hidden', 'false');
-            
+            targetTab.classList.remove("hidden");
+            targetTab.setAttribute("aria-hidden", "false");
+
             // Update active tab button
-            tabButtons.forEach(button => {
+            tabButtons.forEach((button) => {
               if (button.dataset.tab === tabId) {
-                button.classList.add('text-cyan-400', 'border-b-2', 'border-cyan-400');
-                button.classList.remove('text-gray-400');
-                button.setAttribute('aria-selected', 'true');
-                button.setAttribute('tabindex', '0');
+                button.classList.add(
+                  "text-cyan-400",
+                  "border-b-2",
+                  "border-cyan-400"
+                );
+                button.classList.remove("text-gray-400");
+                button.setAttribute("aria-selected", "true");
+                button.setAttribute("tabindex", "0");
               } else {
-                button.classList.remove('text-cyan-400', 'border-b-2', 'border-cyan-400');
-                button.classList.add('text-gray-400');
-                button.setAttribute('aria-selected', 'false');
-                button.setAttribute('tabindex', '-1');
+                button.classList.remove(
+                  "text-cyan-400",
+                  "border-b-2",
+                  "border-cyan-400"
+                );
+                button.classList.add("text-gray-400");
+                button.setAttribute("aria-selected", "false");
+                button.setAttribute("tabindex", "-1");
               }
             });
-            
+
             // Update status for screen readers
-            document.getElementById("status").textContent = `${tabId.charAt(0).toUpperCase() + tabId.slice(1)} tab selected`;
+            document.getElementById("status").textContent = `${
+              tabId.charAt(0).toUpperCase() + tabId.slice(1)
+            } tab selected`;
             setTimeout(() => {
               document.getElementById("status").textContent = "Ready";
             }, 1000);
-            
+
             // Update document title
-            document.title = `Genie Whisper - ${tabId.charAt(0).toUpperCase() + tabId.slice(1)}`;
-            
+            document.title = `Genie Whisper - ${
+              tabId.charAt(0).toUpperCase() + tabId.slice(1)
+            }`;
+
             // Log for debugging
             console.log(`Switched to ${tabId} tab`);
           } catch (error) {
             console.error("Error switching tabs:", error);
-            document.getElementById("status").textContent = "Error switching tabs";
+            document.getElementById("status").textContent =
+              "Error switching tabs";
           }
         }
 
         // Add event listeners to tab buttons
-        tabButtons.forEach(button => {
-          button.addEventListener('click', () => {
+        tabButtons.forEach((button) => {
+          button.addEventListener("click", () => {
             switchTab(button.dataset.tab);
           });
-          
+
           // Add keyboard navigation for accessibility
-          button.addEventListener('keydown', (event) => {
+          button.addEventListener("keydown", (event) => {
             // Handle arrow keys for navigation
-            if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
+            if (event.key === "ArrowRight" || event.key === "ArrowDown") {
               event.preventDefault();
               const nextButton = button.nextElementSibling;
-              if (nextButton && nextButton.hasAttribute('data-tab')) {
+              if (nextButton && nextButton.hasAttribute("data-tab")) {
                 nextButton.focus();
                 switchTab(nextButton.dataset.tab);
               }
-            } else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
+            } else if (event.key === "ArrowLeft" || event.key === "ArrowUp") {
               event.preventDefault();
               const prevButton = button.previousElementSibling;
-              if (prevButton && prevButton.hasAttribute('data-tab')) {
+              if (prevButton && prevButton.hasAttribute("data-tab")) {
                 prevButton.focus();
                 switchTab(prevButton.dataset.tab);
               }
-            } else if (event.key === 'Home') {
+            } else if (event.key === "Home") {
               event.preventDefault();
               const firstButton = tabButtons[0];
               firstButton.focus();
               switchTab(firstButton.dataset.tab);
-            } else if (event.key === 'End') {
+            } else if (event.key === "End") {
               event.preventDefault();
               const lastButton = tabButtons[tabButtons.length - 1];
               lastButton.focus();
@@ -541,36 +569,36 @@
             }
           });
         });
-        
+
         // Add keyboard shortcuts for tabs
-        document.addEventListener('keydown', (event) => {
+        document.addEventListener("keydown", (event) => {
           // Ctrl+1 for Main tab
-          if (event.ctrlKey && event.key === '1') {
-            switchTab('main');
+          if (event.ctrlKey && event.key === "1") {
+            switchTab("main");
           }
           // Ctrl+2 for Settings tab
-          else if (event.ctrlKey && event.key === '2') {
-            switchTab('settings');
+          else if (event.ctrlKey && event.key === "2") {
+            switchTab("settings");
           }
           // Ctrl+3 for Devices tab
-          else if (event.ctrlKey && event.key === '3') {
-            switchTab('devices');
+          else if (event.ctrlKey && event.key === "3") {
+            switchTab("devices");
           }
           // Ctrl+4 for Help tab
-          else if (event.ctrlKey && event.key === '4') {
-            switchTab('help');
+          else if (event.ctrlKey && event.key === "4") {
+            switchTab("help");
           }
           // Ctrl+, for Settings (common shortcut in many apps)
-          else if (event.ctrlKey && event.key === ',') {
-            switchTab('settings');
+          else if (event.ctrlKey && event.key === ",") {
+            switchTab("settings");
           }
           // Ctrl+H for Help
-          else if (event.ctrlKey && event.key === 'h') {
-            switchTab('help');
+          else if (event.ctrlKey && event.key === "h") {
+            switchTab("help");
           }
           // Ctrl+D for Devices
-          else if (event.ctrlKey && event.key === 'd') {
-            switchTab('devices');
+          else if (event.ctrlKey && event.key === "d") {
+            switchTab("devices");
           }
         });
 
@@ -589,6 +617,29 @@
 
             // Animate waveform bars
             animateWaveform();
+
+            // Add active class to genie container for special animation
+            const genieContainer = document.querySelector(".genie-container");
+            if (genieContainer) {
+              genieContainer.classList.add("active");
+              
+              // Add listening animation styles
+              const style = document.createElement('style');
+              style.id = 'genie-listening-style';
+              style.textContent = `
+                .genie-container.active img {
+                  animation: activePulseAnimation 2s ease-in-out infinite !important;
+                  filter: drop-shadow(0 0 20px rgba(6, 182, 212, 1)) !important;
+                  mix-blend-mode: screen !important;
+                }
+                @keyframes activePulseAnimation {
+                  0% { transform: translateY(0) scale(1.05); }
+                  50% { transform: translateY(-10px) scale(1.2); }
+                  100% { transform: translateY(0) scale(1.05); }
+                }
+              `;
+              document.head.appendChild(style);
+            }
           } else {
             document.body.classList.remove("listening");
             document.getElementById("status").textContent = "Ready";
@@ -603,6 +654,18 @@
             bars.forEach((bar) => {
               bar.style.height = "5px";
             });
+
+            // Remove active class from genie container
+            const genieContainer = document.querySelector(".genie-container");
+            if (genieContainer) {
+              genieContainer.classList.remove("active");
+              
+              // Remove listening animation styles
+              const listeningStyle = document.getElementById('genie-listening-style');
+              if (listeningStyle) {
+                listeningStyle.remove();
+              }
+            }
           }
         };
 
@@ -655,11 +718,12 @@
               // Create a simple animation to simulate closing
               root.style.transition = "opacity 0.3s ease-out";
               root.style.opacity = "0";
-              
+
               setTimeout(() => {
                 // Reset after animation
                 root.style.opacity = "1";
-                document.getElementById("status").textContent = "Window would be hidden in production";
+                document.getElementById("status").textContent =
+                  "Window would be hidden in production";
                 setTimeout(() => {
                   document.getElementById("status").textContent = "Ready";
                 }, 2000);
@@ -679,15 +743,17 @@
               const root = document.getElementById("root");
               if (root) {
                 // Create a simple animation to simulate minimizing
-                root.style.transition = "transform 0.3s ease-out, opacity 0.3s ease-out";
+                root.style.transition =
+                  "transform 0.3s ease-out, opacity 0.3s ease-out";
                 root.style.transform = "scale(0.8)";
                 root.style.opacity = "0.5";
-                
+
                 setTimeout(() => {
                   // Reset after animation
                   root.style.transform = "scale(1)";
                   root.style.opacity = "1";
-                  document.getElementById("status").textContent = "Window would be minimized in production";
+                  document.getElementById("status").textContent =
+                    "Window would be minimized in production";
                   setTimeout(() => {
                     document.getElementById("status").textContent = "Ready";
                   }, 2000);
@@ -700,84 +766,106 @@
           .getElementById("settings-btn")
           ?.addEventListener("click", () => {
             console.log("Settings button clicked");
-            switchTab('settings');
+            switchTab("settings");
             if (window.api) {
               window.api.send("show-settings");
             }
           });
-          
+
         // Settings form handlers
-        document.getElementById("save-settings-btn")?.addEventListener("click", () => {
-          try {
-            // Validate settings before saving
-            const settings = {
-              alwaysOnTop: document.getElementById("alwaysOnTop").checked,
-              startMinimized: document.getElementById("startMinimized").checked,
-              startWithSystem: document.getElementById("startWithSystem").checked,
-              modelSize: document.getElementById("modelSize").value,
-              sensitivity: parseFloat(document.getElementById("sensitivity").value),
-              useVAD: document.getElementById("useVAD").checked,
-              activationMode: document.getElementById("activationMode").value,
-              wakeWord: document.getElementById("wakeWord").value.trim()
-            };
-            
-            // Validate wake word if wake word mode is selected
-            if (settings.activationMode === 'wake_word' && !settings.wakeWord) {
-              throw new Error("Wake word is required when wake word activation mode is selected");
+        document
+          .getElementById("save-settings-btn")
+          ?.addEventListener("click", () => {
+            try {
+              // Validate settings before saving
+              const settings = {
+                alwaysOnTop: document.getElementById("alwaysOnTop").checked,
+                startMinimized:
+                  document.getElementById("startMinimized").checked,
+                startWithSystem:
+                  document.getElementById("startWithSystem").checked,
+                modelSize: document.getElementById("modelSize").value,
+                sensitivity: parseFloat(
+                  document.getElementById("sensitivity").value
+                ),
+                useVAD: document.getElementById("useVAD").checked,
+                activationMode: document.getElementById("activationMode").value,
+                wakeWord: document.getElementById("wakeWord").value.trim(),
+              };
+
+              // Validate wake word if wake word mode is selected
+              if (
+                settings.activationMode === "wake_word" &&
+                !settings.wakeWord
+              ) {
+                throw new Error(
+                  "Wake word is required when wake word activation mode is selected"
+                );
+              }
+
+              // Validate sensitivity
+              if (
+                isNaN(settings.sensitivity) ||
+                settings.sensitivity < 0 ||
+                settings.sensitivity > 1
+              ) {
+                throw new Error("Sensitivity must be a number between 0 and 1");
+              }
+
+              // Save settings logic would go here
+              console.log("Saving settings:", settings);
+
+              // In production, we would send these settings to the main process
+              if (window.api) {
+                window.api.send("update-settings", settings);
+              }
+
+              document.getElementById("status").textContent = "Settings saved";
+              setTimeout(() => {
+                document.getElementById("status").textContent = "Ready";
+              }, 2000);
+            } catch (error) {
+              console.error("Error saving settings:", error);
+              document.getElementById(
+                "status"
+              ).textContent = `Error: ${error.message}`;
+              setTimeout(() => {
+                document.getElementById("status").textContent = "Ready";
+              }, 3000);
             }
-            
-            // Validate sensitivity
-            if (isNaN(settings.sensitivity) || settings.sensitivity < 0 || settings.sensitivity > 1) {
-              throw new Error("Sensitivity must be a number between 0 and 1");
+          });
+
+        document
+          .getElementById("reset-settings-btn")
+          ?.addEventListener("click", () => {
+            try {
+              // Reset settings to defaults
+              document.getElementById("alwaysOnTop").checked = true;
+              document.getElementById("startMinimized").checked = false;
+              document.getElementById("startWithSystem").checked = true;
+              document.getElementById("modelSize").value = "base";
+              document.getElementById("sensitivity").value = "0.5";
+              document.getElementById("sensitivity-value").textContent = "0.5";
+              document.getElementById("useVAD").checked = true;
+              document.getElementById("activationMode").value = "manual";
+              document.getElementById("wakeWord").value = "Hey Genie";
+
+              document.getElementById("status").textContent =
+                "Settings reset to defaults";
+              setTimeout(() => {
+                document.getElementById("status").textContent = "Ready";
+              }, 2000);
+            } catch (error) {
+              console.error("Error resetting settings:", error);
+              document.getElementById(
+                "status"
+              ).textContent = `Error: ${error.message}`;
+              setTimeout(() => {
+                document.getElementById("status").textContent = "Ready";
+              }, 3000);
             }
-            
-            // Save settings logic would go here
-            console.log("Saving settings:", settings);
-            
-            // In production, we would send these settings to the main process
-            if (window.api) {
-              window.api.send("update-settings", settings);
-            }
-            
-            document.getElementById("status").textContent = "Settings saved";
-            setTimeout(() => {
-              document.getElementById("status").textContent = "Ready";
-            }, 2000);
-          } catch (error) {
-            console.error("Error saving settings:", error);
-            document.getElementById("status").textContent = `Error: ${error.message}`;
-            setTimeout(() => {
-              document.getElementById("status").textContent = "Ready";
-            }, 3000);
-          }
-        });
-        
-        document.getElementById("reset-settings-btn")?.addEventListener("click", () => {
-          try {
-            // Reset settings to defaults
-            document.getElementById("alwaysOnTop").checked = true;
-            document.getElementById("startMinimized").checked = false;
-            document.getElementById("startWithSystem").checked = true;
-            document.getElementById("modelSize").value = "base";
-            document.getElementById("sensitivity").value = "0.5";
-            document.getElementById("sensitivity-value").textContent = "0.5";
-            document.getElementById("useVAD").checked = true;
-            document.getElementById("activationMode").value = "manual";
-            document.getElementById("wakeWord").value = "Hey Genie";
-            
-            document.getElementById("status").textContent = "Settings reset to defaults";
-            setTimeout(() => {
-              document.getElementById("status").textContent = "Ready";
-            }, 2000);
-          } catch (error) {
-            console.error("Error resetting settings:", error);
-            document.getElementById("status").textContent = `Error: ${error.message}`;
-            setTimeout(() => {
-              document.getElementById("status").textContent = "Ready";
-            }, 3000);
-          }
-        });
-        
+          });
+
         // Update sensitivity value display
         const sensitivitySlider = document.getElementById("sensitivity");
         const sensitivityValue = document.getElementById("sensitivity-value");
@@ -786,97 +874,116 @@
             sensitivityValue.textContent = sensitivitySlider.value;
           });
         }
-        
+
         // Handle activation mode changes
         const activationModeSelect = document.getElementById("activationMode");
-        const wakeWordContainer = document.getElementById("wakeWord").parentElement;
-        
+        const wakeWordContainer =
+          document.getElementById("wakeWord").parentElement;
+
         if (activationModeSelect && wakeWordContainer) {
           // Set initial state
-          wakeWordContainer.style.opacity = activationModeSelect.value === 'wake_word' ? '1' : '0.5';
-          wakeWordContainer.style.pointerEvents = activationModeSelect.value === 'wake_word' ? 'auto' : 'none';
-          
+          wakeWordContainer.style.opacity =
+            activationModeSelect.value === "wake_word" ? "1" : "0.5";
+          wakeWordContainer.style.pointerEvents =
+            activationModeSelect.value === "wake_word" ? "auto" : "none";
+
           // Add event listener for changes
           activationModeSelect.addEventListener("change", () => {
-            const isWakeWordMode = activationModeSelect.value === 'wake_word';
-            
+            const isWakeWordMode = activationModeSelect.value === "wake_word";
+
             // Animate the transition
             wakeWordContainer.style.transition = "opacity 0.3s ease";
-            wakeWordContainer.style.opacity = isWakeWordMode ? '1' : '0.5';
-            wakeWordContainer.style.pointerEvents = isWakeWordMode ? 'auto' : 'none';
-            
+            wakeWordContainer.style.opacity = isWakeWordMode ? "1" : "0.5";
+            wakeWordContainer.style.pointerEvents = isWakeWordMode
+              ? "auto"
+              : "none";
+
             // Update status for screen readers
-            document.getElementById("status").textContent = `Activation mode set to ${activationModeSelect.options[activationModeSelect.selectedIndex].text}`;
+            document.getElementById(
+              "status"
+            ).textContent = `Activation mode set to ${
+              activationModeSelect.options[activationModeSelect.selectedIndex]
+                .text
+            }`;
             setTimeout(() => {
               document.getElementById("status").textContent = "Ready";
             }, 2000);
           });
         }
-        
+
         // Refresh devices button
-        document.getElementById("refresh-devices-btn")?.addEventListener("click", () => {
-          try {
-            document.getElementById("status").textContent = "Refreshing devices...";
-            
-            // In a real implementation, we would use the MediaDevices API to get the list of devices
-            // For this demo, we'll simulate the process with a timeout
-            const deviceSelect = document.getElementById("deviceSelect");
-            
-            if (deviceSelect) {
-              // Clear existing options except the default
-              while (deviceSelect.options.length > 1) {
-                deviceSelect.remove(1);
-              }
-              
-              // Disable the select while "loading"
-              deviceSelect.disabled = true;
-              
-              // Simulate loading delay
-              setTimeout(() => {
-                try {
-                  // In a real implementation, we would enumerate devices using:
-                  // navigator.mediaDevices.enumerateDevices()
-                  
-                  // For demo, add some sample devices
-                  const sampleDevices = [
-                    { id: "default", label: "Default Microphone" },
-                    { id: "built-in", label: "Built-in Microphone" },
-                    { id: "usb-mic", label: "USB Microphone" },
-                    { id: "focusrite", label: "Focusrite Clarett 4 Pre" },
-                    { id: "bluetooth", label: "Bluetooth Headset" }
-                  ];
-                  
-                  // Add the devices to the select
-                  sampleDevices.forEach(device => {
-                    const option = document.createElement("option");
-                    option.value = device.id;
-                    option.text = device.label;
-                    deviceSelect.appendChild(option);
-                  });
-                  
-                  // Re-enable the select
-                  deviceSelect.disabled = false;
-                  
-                  // Update status
-                  document.getElementById("status").textContent = `Found ${sampleDevices.length} audio devices`;
-                  setTimeout(() => {
-                    document.getElementById("status").textContent = "Ready";
-                  }, 2000);
-                } catch (innerError) {
-                  console.error("Error adding devices:", innerError);
-                  document.getElementById("status").textContent = `Error: ${innerError.message}`;
-                  deviceSelect.disabled = false;
+        document
+          .getElementById("refresh-devices-btn")
+          ?.addEventListener("click", () => {
+            try {
+              document.getElementById("status").textContent =
+                "Refreshing devices...";
+
+              // In a real implementation, we would use the MediaDevices API to get the list of devices
+              // For this demo, we'll simulate the process with a timeout
+              const deviceSelect = document.getElementById("deviceSelect");
+
+              if (deviceSelect) {
+                // Clear existing options except the default
+                while (deviceSelect.options.length > 1) {
+                  deviceSelect.remove(1);
                 }
-              }, 1000);
+
+                // Disable the select while "loading"
+                deviceSelect.disabled = true;
+
+                // Simulate loading delay
+                setTimeout(() => {
+                  try {
+                    // In a real implementation, we would enumerate devices using:
+                    // navigator.mediaDevices.enumerateDevices()
+
+                    // For demo, add some sample devices
+                    const sampleDevices = [
+                      { id: "default", label: "Default Microphone" },
+                      { id: "built-in", label: "Built-in Microphone" },
+                      { id: "usb-mic", label: "USB Microphone" },
+                      { id: "focusrite", label: "Focusrite Clarett 4 Pre" },
+                      { id: "bluetooth", label: "Bluetooth Headset" },
+                    ];
+
+                    // Add the devices to the select
+                    sampleDevices.forEach((device) => {
+                      const option = document.createElement("option");
+                      option.value = device.id;
+                      option.text = device.label;
+                      deviceSelect.appendChild(option);
+                    });
+
+                    // Re-enable the select
+                    deviceSelect.disabled = false;
+
+                    // Update status
+                    document.getElementById(
+                      "status"
+                    ).textContent = `Found ${sampleDevices.length} audio devices`;
+                    setTimeout(() => {
+                      document.getElementById("status").textContent = "Ready";
+                    }, 2000);
+                  } catch (innerError) {
+                    console.error("Error adding devices:", innerError);
+                    document.getElementById(
+                      "status"
+                    ).textContent = `Error: ${innerError.message}`;
+                    deviceSelect.disabled = false;
+                  }
+                }, 1000);
+              }
+            } catch (error) {
+              console.error("Error refreshing devices:", error);
+              document.getElementById(
+                "status"
+              ).textContent = `Error: ${error.message}`;
+              setTimeout(() => {
+                document.getElementById("status").textContent = "Ready";
+              }, 3000);
             }
-          } catch (error) {
-            console.error("Error refreshing devices:", error);
-            document.getElementById("status").textContent = `Error: ${error.message}`;
-            setTimeout(() => {
-              document.getElementById("status").textContent = "Ready";
-            }, 3000);
-          }
-        });
+          });
       });
     </script>
   </body>
