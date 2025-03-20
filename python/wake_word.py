@@ -123,28 +123,166 @@ class WhisperWakeWordDetector:
             if audio is None:
                 audio = self.audio_buffer
             
-            # Transcribe audio
+            # Preprocess audio to improve quality
+            audio = self._preprocess_audio(audio)
+            
+            # Transcribe audio with improved parameters
             segments, info = self.model.transcribe(
                 audio,
                 language="en",
-                beam_size=1,
+                beam_size=5,  # Increased beam size for better accuracy
                 vad_filter=True
             )
             
             # Combine segments
             text = " ".join(segment.text for segment in segments).lower()
             
-            # Check if wake word is in transcription
-            detected = self.wake_word in text
+            # Check for exact match first (fastest path)
+            if self.wake_word in text:
+                logger.info(f"Wake word 'Hey Genie' detected: '{text}'")
+                return True
+                
+            # If no exact match, check for similar phrases
+            similarity = self._calculate_similarity(text)
+            
+            # Detect based on similarity threshold
+            detected = similarity >= self.threshold
             
             if detected:
-                logger.info(f"Wake word detected: '{text}'")
+                logger.info(f"Wake word 'Hey Genie' detected with similarity {similarity:.2f}: '{text}'")
+            elif similarity > 0.5:  # Log near misses for debugging
+                logger.debug(f"Wake word near miss: '{text}' (similarity: {similarity:.2f})")
             
             return detected
             
         except Exception as e:
             logger.error(f"Error detecting wake word: {e}")
             return False
+    
+    def _preprocess_audio(self, audio: np.ndarray) -> np.ndarray:
+        """Preprocess audio to improve quality for wake word detection.
+        
+        Args:
+            audio: Numpy array of audio samples
+            
+        Returns:
+            Preprocessed audio
+        """
+        try:
+            # Normalize audio
+            if np.max(np.abs(audio)) > 0:
+                audio = audio / np.max(np.abs(audio))
+            
+            # Apply simple noise reduction
+            try:
+                from scipy import signal
+                
+                # Design a high-pass filter (remove frequencies below 80Hz)
+                b, a = signal.butter(4, 80/(self.sample_rate/2), 'highpass')
+                
+                # Apply the filter
+                audio = signal.filtfilt(b, a, audio)
+                
+            except ImportError:
+                # If scipy is not available, skip this step
+                pass
+            
+            return audio
+            
+        except Exception as e:
+            logger.warning(f"Error preprocessing audio: {e}")
+            return audio
+    
+    def _calculate_similarity(self, text: str) -> float:
+        """Calculate similarity between transcribed text and wake word.
+        
+        Args:
+            text: Transcribed text
+            
+        Returns:
+            Similarity score (0.0-1.0)
+        """
+        # Common variations of "Hey Genie"
+        variations = [
+            "hey genie", "hay genie", "hey jeanie", "hey gini",
+            "hey genius", "hey jenny", "hey gini", "hey gene",
+            "hey jeannie", "hey jeannie", "hey genie", "hey gini"
+        ]
+        
+        # Check for common variations
+        for variation in variations:
+            if variation in text:
+                # Calculate similarity based on how close the variation is to "hey genie"
+                return max(0.8, 1.0 - (len(variation) - len("hey genie")) / len("hey genie"))
+        
+        # If no variation found, check for partial matches
+        words = text.split()
+        
+        # Look for "hey" followed by something similar to "genie"
+        for i in range(len(words) - 1):
+            if self._is_similar("hey", words[i], 0.7) and self._is_similar("genie", words[i+1], 0.6):
+                return 0.7
+        
+        # Look for individual words
+        hey_similarity = max([self._is_similar("hey", word, 0.7) for word in words], default=0)
+        genie_similarity = max([self._is_similar("genie", word, 0.6) for word in words], default=0)
+        
+        # Combined similarity score
+        return (hey_similarity + genie_similarity) / 2
+    
+    def _is_similar(self, target: str, word: str, threshold: float) -> float:
+        """Check if a word is similar to a target word.
+        
+        Args:
+            target: Target word
+            word: Word to compare
+            threshold: Similarity threshold
+            
+        Returns:
+            Similarity score if above threshold, otherwise 0
+        """
+        # Exact match
+        if target == word:
+            return 1.0
+            
+        # Empty strings
+        if not target or not word:
+            return 0.0
+            
+        # Calculate Levenshtein distance
+        distance = self._levenshtein_distance(target, word)
+        max_len = max(len(target), len(word))
+        similarity = 1.0 - (distance / max_len)
+        
+        return similarity if similarity >= threshold else 0.0
+    
+    def _levenshtein_distance(self, s1: str, s2: str) -> int:
+        """Calculate Levenshtein distance between two strings.
+        
+        Args:
+            s1: First string
+            s2: Second string
+            
+        Returns:
+            Levenshtein distance
+        """
+        if len(s1) < len(s2):
+            return self._levenshtein_distance(s2, s1)
+            
+        if len(s2) == 0:
+            return len(s1)
+            
+        previous_row = range(len(s2) + 1)
+        for i, c1 in enumerate(s1):
+            current_row = [i + 1]
+            for j, c2 in enumerate(s2):
+                insertions = previous_row[j + 1] + 1
+                deletions = current_row[j] + 1
+                substitutions = previous_row[j] + (c1 != c2)
+                current_row.append(min(insertions, deletions, substitutions))
+            previous_row = current_row
+            
+        return previous_row[-1]
     
     def start_listening(self, callback: Callable[[np.ndarray], None]) -> None:
         """Start listening for wake word.
@@ -190,6 +328,20 @@ class WhisperWakeWordDetector:
         # Create a queue for audio data
         audio_queue = queue.Queue()
         
+        # Create sliding windows for better detection
+        window_duration = 2.0  # 2-second windows
+        window_step = 0.5      # 0.5-second step
+        window_size = int(self.sample_rate * window_duration)
+        step_size = int(self.sample_rate * window_step)
+        
+        # Store recent audio for sliding window analysis
+        recent_audio = []
+        total_samples = 0
+        
+        # Track consecutive detections for confidence
+        consecutive_detections = 0
+        required_detections = 2  # Require multiple detections for confirmation
+        
         # Callback for audio stream
         def audio_callback(indata, frames, time, status):
             if status:
@@ -214,18 +366,57 @@ class WhisperWakeWordDetector:
                         # Get audio from queue with timeout
                         audio = audio_queue.get(timeout=0.5)
                         
-                        # Add audio to buffer
-                        self.add_audio(audio.squeeze())
+                        # Add audio to buffer and recent audio
+                        audio_flat = audio.squeeze()
+                        self.add_audio(audio_flat)
                         
-                        # Check for wake word every 0.5 seconds
-                        if audio_queue.qsize() == 0:
-                            if self.detect_wake_word():
-                                # Wake word detected, call callback
+                        # Add to recent audio for sliding window
+                        recent_audio.append(audio_flat)
+                        total_samples += len(audio_flat)
+                        
+                        # Keep only enough audio for analysis
+                        while total_samples > window_size * 2:
+                            removed = recent_audio.pop(0)
+                            total_samples -= len(removed)
+                        
+                        # Process when queue is empty (batch processing)
+                        if audio_queue.qsize() == 0 and total_samples >= window_size:
+                            # Create concatenated audio for sliding window
+                            all_audio = np.concatenate(recent_audio)
+                            
+                            # Create sliding windows
+                            detected = False
+                            for start in range(0, max(1, len(all_audio) - window_size), step_size):
+                                window = all_audio[start:start + window_size]
+                                
+                                # Skip windows that are too short
+                                if len(window) < window_size * 0.75:
+                                    continue
+                                
+                                # Check for wake word in this window
+                                if self.detect_wake_word(window):
+                                    detected = True
+                                    consecutive_detections += 1
+                                    logger.debug(f"Potential wake word detected (confidence: {consecutive_detections}/{required_detections})")
+                                    break
+                            
+                            # If no detection in any window, decrease confidence
+                            if not detected:
+                                consecutive_detections = max(0, consecutive_detections - 0.5)
+                            
+                            # If we have enough consecutive detections
+                            if consecutive_detections >= required_detections:
+                                logger.info(f"Wake word 'Hey Genie' confirmed with {consecutive_detections} consecutive detections")
+                                
+                                # Call callback with the full buffer for context
                                 if self.callback:
                                     self.callback(self.audio_buffer)
                                 
-                                # Reset buffer
+                                # Reset buffer, recent audio, and detection counter
                                 self.reset_buffer()
+                                recent_audio.clear()
+                                total_samples = 0
+                                consecutive_detections = 0
                     
                     except queue.Empty:
                         # No audio available, continue
@@ -286,20 +477,32 @@ class PorcupineWakeWordDetector:
                     sensitivities=[self.sensitivity]
                 )
             else:
-                # Use built-in "Hey Genie" or "Computer" as fallback
+                # Try to use built-in keywords that sound similar to "Hey Genie"
                 try:
+                    # First try with "Genie" if available
                     self.porcupine = pvporcupine.create(
                         access_key=self.access_key,
-                        keywords=["jarvis"],
+                        keywords=["genie"],
                         sensitivities=[self.sensitivity]
                     )
+                    logger.info("Using 'Genie' as wake word")
                 except:
-                    # Try "Computer" as fallback
-                    self.porcupine = pvporcupine.create(
-                        access_key=self.access_key,
-                        keywords=["computer"],
-                        sensitivities=[self.sensitivity]
-                    )
+                    try:
+                        # Try with "Jarvis" as it has similar phonetics
+                        self.porcupine = pvporcupine.create(
+                            access_key=self.access_key,
+                            keywords=["jarvis"],
+                            sensitivities=[self.sensitivity]
+                        )
+                        logger.info("Using 'Jarvis' as wake word (fallback for 'Hey Genie')")
+                    except:
+                        # Try "Computer" as final fallback
+                        self.porcupine = pvporcupine.create(
+                            access_key=self.access_key,
+                            keywords=["computer"],
+                            sensitivities=[self.sensitivity]
+                        )
+                        logger.info("Using 'Computer' as wake word (fallback for 'Hey Genie')")
             
             logger.info(f"Porcupine wake word detector initialized with sensitivity {self.sensitivity}")
             
@@ -340,7 +543,12 @@ class PorcupineWakeWordDetector:
                     
                     # Check result
                     if result >= 0:
-                        logger.info("Wake word detected")
+                        # Get the keyword that was detected
+                        keyword = "Hey Genie"
+                        if self.porcupine.keywords and result < len(self.porcupine.keywords):
+                            keyword = self.porcupine.keywords[result]
+                        
+                        logger.info(f"Wake word detected: '{keyword}' (using as 'Hey Genie')")
                         return True
             
             return False
@@ -394,8 +602,16 @@ class PorcupineWakeWordDetector:
         # Frame length required by Porcupine
         frame_length = self.porcupine.frame_length
         
+        # Track consecutive detections for confidence
+        consecutive_detections = 0
+        required_detections = 2  # Require multiple detections for confirmation
+        detection_window_ms = 1000  # Time window for consecutive detections (ms)
+        last_detection_time = 0
+        
         # Callback for audio stream
         def audio_callback(indata, frames, time, status):
+            nonlocal consecutive_detections, last_detection_time
+            
             if status:
                 logger.warning(f"Audio callback status: {status}")
             
@@ -407,9 +623,36 @@ class PorcupineWakeWordDetector:
                 result = self.porcupine.process(audio_int16)
                 
                 # Check result
-                if result >= 0 and self.callback:
-                    # Wake word detected, call callback
-                    self.callback()
+                if result >= 0:
+                    # Get current time
+                    current_time = int(time.time() * 1000)
+                    
+                    # Check if this is within the detection window
+                    if current_time - last_detection_time < detection_window_ms:
+                        consecutive_detections += 1
+                    else:
+                        consecutive_detections = 1
+                    
+                    # Update last detection time
+                    last_detection_time = current_time
+                    
+                    # Log potential detection
+                    logger.debug(f"Potential wake word detected (confidence: {consecutive_detections}/{required_detections})")
+                    
+                    # If we have enough consecutive detections
+                    if consecutive_detections >= required_detections and self.callback:
+                        # Get the keyword that was detected
+                        keyword = "Hey Genie"
+                        if self.porcupine.keywords and result < len(self.porcupine.keywords):
+                            keyword = self.porcupine.keywords[result]
+                            
+                        logger.info(f"Wake word '{keyword}' confirmed with {consecutive_detections} consecutive detections")
+                        
+                        # Call callback
+                        self.callback()
+                        
+                        # Reset consecutive detections
+                        consecutive_detections = 0
                     
             except Exception as e:
                 logger.error(f"Error processing audio: {e}")
@@ -428,6 +671,11 @@ class PorcupineWakeWordDetector:
                 # Keep stream open while listening
                 while self.is_listening:
                     time.sleep(0.1)
+                    
+                    # Reset consecutive detections if too much time has passed
+                    current_time = int(time.time() * 1000)
+                    if current_time - last_detection_time > detection_window_ms * 2 and consecutive_detections > 0:
+                        consecutive_detections = 0
                 
                 logger.info("Wake word audio stream stopped")
                 

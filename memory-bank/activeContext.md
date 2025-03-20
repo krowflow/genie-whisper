@@ -50,6 +50,7 @@ We are currently in the **Backend Implementation and Integration phase** for Gen
 | 2025-03-20 | Audio Device Configuration | Configured Focusrite Clarett 4 Pre as default audio device |
 | 2025-03-20 | Transcription Preview Fix | Fixed transcription preview display in the UI |
 | 2025-03-20 | Enhanced VAD Implementation | Implemented hybrid VAD approach using both Silero and WebRTC for better noise filtering |
+| 2025-03-20 | Improved Wake Word Detection | Enhanced wake word detection with similarity matching and consecutive detection confirmation |
 
 ## Next Steps
 
@@ -116,9 +117,9 @@ We are currently in the **Backend Implementation and Integration phase** for Gen
    - **Status**: Implemented enhanced hybrid approach, merging speech segments from both VADs for better accuracy
 
 3. **Wake Word Detection**
-   - **Current Decision**: Using Whisper for wake word detection, with Porcupine as optional
+   - **Current Decision**: Using enhanced Whisper for wake word detection with similarity matching, with improved Porcupine as fallback
    - **Considerations**: Accuracy, latency, resource usage
-   - **Status**: Basic implementation complete, need to improve accuracy
+   - **Status**: Enhanced implementation with similarity matching and consecutive detection confirmation
 
 4. **IDE Integration**
    - **Current Decision**: Using clipboard-based approach with fallback

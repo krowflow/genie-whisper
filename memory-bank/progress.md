@@ -185,6 +185,8 @@ As the project is in the implementation phase, there are some known issues:
    - Configured default audio device (Focusrite Clarett 4 Pre)
    - Implemented enhanced hybrid VAD using both Silero and WebRTC for better noise filtering
    - Added improved speech detection logic to reduce false negatives
+   - Enhanced wake word detection accuracy with similarity matching and consecutive detection
+   - Added support for "Hey Genie" variations and phonetic similarity
 2. Implement advanced Genie animations with lip-sync
 3. Optimize performance for real-time transcription
 4. Add more visual feedback for user actions
