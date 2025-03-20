@@ -58,11 +58,12 @@ We are currently in the **Backend Implementation and Integration phase** for Gen
 
 1. **Test and refine audio pipeline** (Current Focus)
    - Test audio capture with test_microphone.py and test_transcription.py
-   - Fix microphone input detection and transcription preview display
-   - Configure Focusrite Clarett 4 Pre as default audio device
-   - Optimize VAD for better noise filtering
-   - Improve wake word detection accuracy
+   - Fix microphone input detection and transcription preview display ✅
+   - Configure Focusrite Clarett 4 Pre as default audio device ✅
+   - Optimize VAD for better noise filtering ✅
+   - Improve wake word detection accuracy ✅
    - Reduce transcription latency using GPU acceleration
+   - Install required dependencies for Whisper and VAD models
 
 2. **Enhance UI experience**
    - Implement advanced Genie animations
