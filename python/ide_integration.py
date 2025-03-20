@@ -147,9 +147,11 @@ class IDEIntegration:
             
             elif self.os_name == "Darwin":
                 # macOS implementation
-                script = f"""
+                # Use string concatenation instead of f-string to avoid backslash issues
+                escaped_text = text.replace('"', '\\"')
+                script = """
                 tell application "System Events"
-                    keystroke "{text.replace('"', '\\"')}"
+                    keystroke \"""" + escaped_text + """\"
                 end tell
                 """
                 
