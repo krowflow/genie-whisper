@@ -1,38 +1,38 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Genie Whisper</title>
-  <link rel="stylesheet" href="styles/main.css">
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script>
-    tailwind.config = {
-      theme: {
-        extend: {
-          colors: {
-            indigo: {
-              950: '#1e1b4b',
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Genie Whisper</title>
+    <link rel="stylesheet" href="styles/main.css" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              indigo: {
+                950: "#1e1b4b",
+              },
             },
           },
         },
-      },
-    }
-  </script>
-</head>
-<body class="bg-indigo-950 text-white font-sans overflow-hidden">
-  <div id="root" class="h-screen"></div>
-  
-  <!-- For development, we'll use a simple script to render our app -->
-  <!-- In production, this would be replaced with bundled React code -->
-  <script>
-    // This is a placeholder for the React application
-    // In a real build process, this would be replaced with the bundled React code
-    document.addEventListener('DOMContentLoaded', () => {
-      const root = document.getElementById('root');
-      
-      // Create a simple UI that mimics our React components
-      root.innerHTML = `
+      };
+    </script>
+  </head>
+  <body class="bg-indigo-950 text-white font-sans overflow-hidden">
+    <div id="root" class="h-screen"></div>
+
+    <!-- For development, we'll use a simple script to render our app -->
+    <!-- In production, this would be replaced with bundled React code -->
+    <script>
+      // This is a placeholder for the React application
+      // In a real build process, this would be replaced with the bundled React code
+      document.addEventListener("DOMContentLoaded", () => {
+        const root = document.getElementById("root");
+
+        // Create a simple UI that mimics our React components
+        root.innerHTML = `
         <div class="h-screen flex flex-col bg-indigo-950">
           <!-- Draggable title bar -->
           <div class="bg-indigo-950 p-2 flex justify-between items-center draggable">
@@ -69,14 +69,56 @@
               <p class="text-xs text-gray-400">Your Voice-to-Text Assistant</p>
             </div>
             
-            <!-- Main UI area with Genie on left, waveform in center, mic on right -->
-            <div class="flex-grow flex flex-col justify-center">
+            <!-- Tab Navigation -->
+            <div class="tab-navigation flex border-b border-indigo-700 mb-4">
+              <button
+                id="main-tab-btn"
+                class="px-4 py-2 text-cyan-400 border-b-2 border-cyan-400"
+                data-tab="main"
+              >
+                Main
+              </button>
+              <button
+                id="settings-tab-btn"
+                class="px-4 py-2 text-gray-400 hover:text-white"
+                data-tab="settings"
+              >
+                Settings
+              </button>
+              <button
+                id="devices-tab-btn"
+                class="px-4 py-2 text-gray-400 hover:text-white"
+                data-tab="devices"
+              >
+                Devices
+              </button>
+              <button
+                id="help-tab-btn"
+                class="px-4 py-2 text-gray-400 hover:text-white"
+                data-tab="help"
+              >
+                Help
+              </button>
+            </div>
+            
+            <!-- Tab Content -->
+            <div class="flex-grow flex flex-col">
+              <!-- Main Tab -->
+              <div id="main-tab" class="flex-grow flex flex-col justify-center">
               <!-- Waveform with Genie and Mic on sides -->
               <div class="flex items-center justify-between w-full">
                 <!-- Genie Avatar on left -->
                 <div class="w-1/4 flex justify-center" id="genie-container">
-                  <div class="w-32 h-32 rounded-full bg-indigo-900 flex items-center justify-center">
-                    <img src="../images/genie_without_background.png" alt="Genie" class="w-24 h-24 object-contain">
+                  <div class="w-32 h-32 rounded-full bg-indigo-900 flex items-center justify-center overflow-hidden">
+                    <!-- Genie PNG image -->
+                    <div class="flex items-center justify-center w-full h-full">
+                      <img
+                        src="../images/genie smoke silhouette.png"
+                        alt="Genie Silhouette"
+                        class="w-24 h-24 object-contain"
+                        style="filter: drop-shadow(0 0 5px rgba(6, 182, 212, 0.4));"
+                      />
+                    </div>
                   </div>
                 </div>
                 
@@ -100,6 +142,264 @@
                   </div>
                 </div>
               </div>
+              </div>
+              
+              <!-- Settings Tab (hidden by default) -->
+              <div id="settings-tab" class="hidden flex-grow p-4" style="max-height: 70vh; overflow-y: auto;">
+                <h2 class="text-lg font-medium text-white mb-4">Settings</h2>
+                
+                <!-- General Settings -->
+                <div class="mb-6">
+                  <h3 class="text-sm font-medium text-cyan-300 mb-3 border-b border-indigo-700 pb-1">
+                    General Settings
+                  </h3>
+                  
+                  <div class="mb-3">
+                    <label class="flex items-center text-white">
+                      <input
+                        type="checkbox"
+                        id="alwaysOnTop"
+                        class="mr-2 bg-indigo-700 border-indigo-600 text-cyan-400 focus:ring-cyan-400"
+                        checked
+                      />
+                      Always on top
+                    </label>
+                  </div>
+                  
+                  <div class="mb-3">
+                    <label class="flex items-center text-white">
+                      <input
+                        type="checkbox"
+                        id="startMinimized"
+                        class="mr-2 bg-indigo-700 border-indigo-600 text-cyan-400 focus:ring-cyan-400"
+                      />
+                      Start minimized
+                    </label>
+                  </div>
+                  
+                  <div class="mb-3">
+                    <label class="flex items-center text-white">
+                      <input
+                        type="checkbox"
+                        id="startWithSystem"
+                        class="mr-2 bg-indigo-700 border-indigo-600 text-cyan-400 focus:ring-cyan-400"
+                        checked
+                      />
+                      Start with system
+                    </label>
+                  </div>
+                </div>
+                
+                <!-- Transcription Settings -->
+                <div class="mb-6">
+                  <h3 class="text-sm font-medium text-cyan-300 mb-3 border-b border-indigo-700 pb-1">
+                    Transcription Settings
+                  </h3>
+                  
+                  <div class="mb-3">
+                    <label for="modelSize" class="block mb-1 text-sm text-white">Model Size</label>
+                    <select
+                      id="modelSize"
+                      class="w-full bg-indigo-800 text-white rounded p-2 border border-indigo-600 focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400"
+                    >
+                      <option value="tiny">Tiny (Fast, Less Accurate)</option>
+                      <option value="base" selected>Base (Balanced)</option>
+                      <option value="small">Small (More Accurate)</option>
+                      <option value="medium">Medium (Most Accurate, Slower)</option>
+                      <option value="large">Large (Highest Accuracy, Slowest)</option>
+                    </select>
+                  </div>
+                  
+                  <div class="mb-3">
+                    <label for="sensitivity" class="block mb-1 text-sm text-white">
+                      Sensitivity: <span id="sensitivity-value">0.5</span>
+                    </label>
+                    <input
+                      type="range"
+                      id="sensitivity"
+                      min="0"
+                      max="1"
+                      step="0.1"
+                      value="0.5"
+                      class="w-full"
+                    />
+                  </div>
+                  
+                  <div class="mb-3">
+                    <label class="flex items-center text-white">
+                      <input
+                        type="checkbox"
+                        id="useVAD"
+                        class="mr-2 bg-indigo-700 border-indigo-600 text-cyan-400 focus:ring-cyan-400"
+                        checked
+                      />
+                      Use Voice Activity Detection
+                    </label>
+                  </div>
+                </div>
+                
+                <!-- Activation Settings -->
+                <div class="mb-6">
+                  <h3 class="text-sm font-medium text-cyan-300 mb-3 border-b border-indigo-700 pb-1">
+                    Activation Settings
+                  </h3>
+                  
+                  <div class="mb-3">
+                    <label for="activationMode" class="block mb-1 text-sm text-white">Activation Mode</label>
+                    <select
+                      id="activationMode"
+                      class="w-full bg-indigo-800 text-white rounded p-2 border border-indigo-600 focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400"
+                    >
+                      <option value="manual" selected>Manual (Hotkey)</option>
+                      <option value="wake_word">Wake Word</option>
+                      <option value="always_on">Always On</option>
+                    </select>
+                  </div>
+                  
+                  <div class="mb-3">
+                    <label for="wakeWord" class="block mb-1 text-sm text-white">Wake Word</label>
+                    <input
+                      type="text"
+                      id="wakeWord"
+                      value="Hey Genie"
+                      class="w-full bg-indigo-800 text-white rounded p-2 border border-indigo-600 focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400"
+                    />
+                  </div>
+                </div>
+                
+                <div class="flex justify-end space-x-2 mt-4">
+                  <button
+                    id="reset-settings-btn"
+                    class="bg-indigo-700 hover:bg-indigo-600 text-white font-medium py-1 px-3 rounded"
+                  >
+                    Reset
+                  </button>
+                  <button
+                    id="save-settings-btn"
+                    class="bg-cyan-600 hover:bg-cyan-500 text-white font-medium py-1 px-3 rounded"
+                  >
+                    Save
+                  </button>
+                </div>
+              </div>
+              
+              <!-- Devices Tab (hidden by default) -->
+              <div id="devices-tab" class="hidden flex-grow p-4" style="max-height: 70vh; overflow-y: auto;">
+                <h2 class="text-lg font-medium text-white mb-4">Audio Devices</h2>
+                
+                <div class="mb-4">
+                  <label for="deviceSelect" class="block mb-2 text-sm text-white">Select Audio Input Device</label>
+                  <select
+                    id="deviceSelect"
+                    class="w-full bg-indigo-800 text-white rounded p-2 border border-indigo-600 focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400"
+                  >
+                    <option value="">Default Device</option>
+                    <!-- Devices will be populated by JavaScript -->
+                  </select>
+                </div>
+                
+                <div class="mt-6">
+                  <h3 class="text-sm font-medium text-cyan-300 mb-2">Audio Settings</h3>
+                  <div class="space-y-3">
+                    <div>
+                      <label for="sampleRate" class="block mb-1 text-sm text-white">Sample Rate</label>
+                      <select
+                        id="sampleRate"
+                        class="w-full bg-indigo-800 text-white rounded p-2 border border-indigo-600 focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400"
+                      >
+                        <option value="16000" selected>16,000 Hz (Recommended for Whisper)</option>
+                        <option value="44100">44,100 Hz (CD Quality)</option>
+                        <option value="48000">48,000 Hz (Professional Audio)</option>
+                      </select>
+                    </div>
+                    
+                    <div>
+                      <label for="bufferSize" class="block mb-1 text-sm text-white">Buffer Size</label>
+                      <select
+                        id="bufferSize"
+                        class="w-full bg-indigo-800 text-white rounded p-2 border border-indigo-600 focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400"
+                      >
+                        <option value="256">256 (Lowest Latency, Higher CPU)</option>
+                        <option value="512" selected>512 (Balanced)</option>
+                        <option value="1024">1024 (Higher Latency, Lower CPU)</option>
+                        <option value="2048">2048 (Highest Latency, Lowest CPU)</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+                
+                <div class="mt-6">
+                  <button
+                    id="refresh-devices-btn"
+                    class="bg-cyan-600 hover:bg-cyan-500 text-white font-medium py-1 px-3 rounded"
+                  >
+                    Refresh Devices
+                  </button>
+                </div>
+              </div>
+              
+              <!-- Help Tab (hidden by default) -->
+              <div id="help-tab" class="hidden flex-grow p-4" style="max-height: 70vh; overflow-y: auto;">
+                <h2 class="text-lg font-medium text-white mb-4">Genie Whisper Help</h2>
+                
+                <div class="space-y-6">
+                  <section>
+                    <h3 class="text-md font-medium text-cyan-300 mb-2">Getting Started</h3>
+                    <p class="text-gray-300 mb-2">
+                      Genie Whisper is a real-time voice-to-text transcription tool designed to work offline and online,
+                      integrating seamlessly with Cursor, VS Code, Roo Code, and Cline Dev.
+                    </p>
+                    <p class="text-gray-300">
+                      To start transcribing, simply click the microphone button or press the configured hotkey
+                      (default: Ctrl+Shift+Space).
+                    </p>
+                  </section>
+                  
+                  <section>
+                    <h3 class="text-md font-medium text-cyan-300 mb-2">Activation Methods</h3>
+                    <ul class="list-disc pl-5 text-gray-300 space-y-1">
+                      <li><strong>Manual Activation</strong>: Click the microphone button or use the hotkey.</li>
+                      <li><strong>Wake Word</strong>: Say "Hey Genie" to activate hands-free (if enabled in settings).</li>
+                      <li><strong>Always On</strong>: Continuous transcription (if enabled in settings).</li>
+                    </ul>
+                  </section>
+                  
+                  <section>
+                    <h3 class="text-md font-medium text-cyan-300 mb-2">Keyboard Shortcuts</h3>
+                    <div class="bg-indigo-900 bg-opacity-50 rounded p-3">
+                      <table class="w-full text-gray-300">
+                        <tbody>
+                          <tr>
+                            <td class="py-1 pr-4 font-medium">Ctrl+Shift+Space</td>
+                            <td>Start/Stop Listening</td>
+                          </tr>
+                          <tr>
+                            <td class="py-1 pr-4 font-medium">Ctrl+,</td>
+                            <td>Open Settings</td>
+                          </tr>
+                          <tr>
+                            <td class="py-1 pr-4 font-medium">Ctrl+H</td>
+                            <td>Open Help</td>
+                          </tr>
+                          <tr>
+                            <td class="py-1 pr-4 font-medium">Ctrl+D</td>
+                            <td>Open Devices</td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  </section>
+                  
+                  <section>
+                    <h3 class="text-md font-medium text-cyan-300 mb-2">About</h3>
+                    <p class="text-gray-300">
+                      Genie Whisper v0.1.0<br />
+                      Using OpenAI Whisper for transcription<br />
+                      © 2025 Genie Whisper Team
+                    </p>
+                  </section>
+                </div>
+              </div>
             </div>
             
             <!-- Status text (small and subtle) -->
@@ -109,113 +409,226 @@
           </div>
         </div>
       `;
-      
-      // Create waveform bars
-      const waveform = document.getElementById('waveform');
-      if (waveform) {
-        for (let i = 0; i < 32; i++) {
-          const bar = document.createElement('div');
-          bar.className = 'waveform-bar';
-          
-          // Randomly assign cyan or pink color
-          const isCyan = Math.random() > 0.2; // 80% chance of cyan
-          bar.classList.add(isCyan ? 'bg-cyan-400' : 'bg-pink-400');
-          
-          // Set initial height
-          const initialHeight = Math.random() * 20 + 5; // Between 5px and 25px
-          bar.style.height = `${initialHeight}px`;
-          
-          waveform.appendChild(bar);
-        }
-      }
-      
-      // Add event listeners
-      const micButton = document.getElementById('mic-button');
-      const genieContainer = document.getElementById('genie-container');
-      let isListening = false;
-      
-      const toggleListening = () => {
-        isListening = !isListening;
-        
-        // Update UI based on listening state
-        if (isListening) {
-          document.body.classList.add('listening');
-          document.getElementById('status').textContent = 'Listening...';
-          
-          // Animate waveform bars
-          animateWaveform();
-        } else {
-          document.body.classList.remove('listening');
-          document.getElementById('status').textContent = 'Ready';
-          
-          // Stop waveform animation
-          if (window.waveformAnimation) {
-            cancelAnimationFrame(window.waveformAnimation);
+
+        // Create waveform bars
+        const waveform = document.getElementById("waveform");
+        if (waveform) {
+          for (let i = 0; i < 32; i++) {
+            const bar = document.createElement("div");
+            bar.className = "waveform-bar";
+
+            // Randomly assign cyan or pink color
+            const isCyan = Math.random() > 0.2; // 80% chance of cyan
+            bar.classList.add(isCyan ? "bg-cyan-400" : "bg-pink-400");
+
+            // Set initial height
+            const initialHeight = Math.random() * 20 + 5; // Between 5px and 25px
+            bar.style.height = `${initialHeight}px`;
+
+            waveform.appendChild(bar);
           }
+        }
+
+        // Tab switching functionality
+        const tabButtons = document.querySelectorAll('[data-tab]');
+        const tabs = document.querySelectorAll('[id$="-tab"]');
+
+        function switchTab(tabId) {
+          // Hide all tabs
+          tabs.forEach(tab => {
+            tab.classList.add('hidden');
+          });
           
-          // Reset waveform bars
-          const bars = document.querySelectorAll('.waveform-bar');
-          bars.forEach(bar => {
-            bar.style.height = '5px';
+          // Show the selected tab
+          document.getElementById(`${tabId}-tab`).classList.remove('hidden');
+          
+          // Update active tab button
+          tabButtons.forEach(button => {
+            if (button.dataset.tab === tabId) {
+              button.classList.add('text-cyan-400', 'border-b-2', 'border-cyan-400');
+              button.classList.remove('text-gray-400');
+            } else {
+              button.classList.remove('text-cyan-400', 'border-b-2', 'border-cyan-400');
+              button.classList.add('text-gray-400');
+            }
           });
         }
-      };
-      
-      const animateWaveform = () => {
-        const bars = document.querySelectorAll('.waveform-bar');
+
+        // Add event listeners to tab buttons
+        tabButtons.forEach(button => {
+          button.addEventListener('click', () => {
+            switchTab(button.dataset.tab);
+          });
+        });
         
-        const animate = () => {
-          bars.forEach(bar => {
-            // Generate random heights for active visualization
-            const height = Math.random() * 40 + 5; // Between 5px and 45px
-            bar.style.height = `${height}px`;
-            
-            // Occasionally change color for some visual interest
-            if (Math.random() < 0.05) { // 5% chance to change color
-              const isCyan = bar.classList.contains('bg-cyan-400');
-              if (isCyan) {
-                bar.classList.remove('bg-cyan-400');
-                bar.classList.add('bg-pink-400');
-              } else {
-                bar.classList.remove('bg-pink-400');
-                bar.classList.add('bg-cyan-400');
+        // Add keyboard shortcuts for tabs
+        document.addEventListener('keydown', (event) => {
+          // Ctrl+1 for Main tab
+          if (event.ctrlKey && event.key === '1') {
+            switchTab('main');
+          }
+          // Ctrl+2 for Settings tab
+          else if (event.ctrlKey && event.key === '2') {
+            switchTab('settings');
+          }
+          // Ctrl+3 for Devices tab
+          else if (event.ctrlKey && event.key === '3') {
+            switchTab('devices');
+          }
+          // Ctrl+4 for Help tab
+          else if (event.ctrlKey && event.key === '4') {
+            switchTab('help');
+          }
+          // Ctrl+, for Settings (common shortcut in many apps)
+          else if (event.ctrlKey && event.key === ',') {
+            switchTab('settings');
+          }
+          // Ctrl+H for Help
+          else if (event.ctrlKey && event.key === 'h') {
+            switchTab('help');
+          }
+          // Ctrl+D for Devices
+          else if (event.ctrlKey && event.key === 'd') {
+            switchTab('devices');
+          }
+        });
+
+        // Add event listeners
+        const micButton = document.getElementById("mic-button");
+        const genieContainer = document.getElementById("genie-container");
+        let isListening = false;
+
+        const toggleListening = () => {
+          isListening = !isListening;
+
+          // Update UI based on listening state
+          if (isListening) {
+            document.body.classList.add("listening");
+            document.getElementById("status").textContent = "Listening...";
+
+            // Animate waveform bars
+            animateWaveform();
+          } else {
+            document.body.classList.remove("listening");
+            document.getElementById("status").textContent = "Ready";
+
+            // Stop waveform animation
+            if (window.waveformAnimation) {
+              cancelAnimationFrame(window.waveformAnimation);
+            }
+
+            // Reset waveform bars
+            const bars = document.querySelectorAll(".waveform-bar");
+            bars.forEach((bar) => {
+              bar.style.height = "5px";
+            });
+          }
+        };
+
+        const animateWaveform = () => {
+          const bars = document.querySelectorAll(".waveform-bar");
+
+          const animate = () => {
+            bars.forEach((bar) => {
+              // Generate random heights for active visualization
+              const height = Math.random() * 40 + 5; // Between 5px and 45px
+              bar.style.height = `${height}px`;
+
+              // Occasionally change color for some visual interest
+              if (Math.random() < 0.05) {
+                // 5% chance to change color
+                const isCyan = bar.classList.contains("bg-cyan-400");
+                if (isCyan) {
+                  bar.classList.remove("bg-cyan-400");
+                  bar.classList.add("bg-pink-400");
+                } else {
+                  bar.classList.remove("bg-pink-400");
+                  bar.classList.add("bg-cyan-400");
+                }
               }
+            });
+
+            window.waveformAnimation = requestAnimationFrame(animate);
+          };
+
+          animate();
+        };
+
+        if (micButton) {
+          micButton.addEventListener("click", toggleListening);
+        }
+
+        if (genieContainer) {
+          genieContainer.addEventListener("click", toggleListening);
+        }
+
+        // Handle window controls
+        document.getElementById("close-btn")?.addEventListener("click", () => {
+          console.log("Close button clicked");
+          if (window.api) {
+            window.api.send("close-window");
+          } else {
+            // For development without Electron
+            alert("Close button clicked (would close the app in production)");
+          }
+        });
+
+        document
+          .getElementById("minimize-btn")
+          ?.addEventListener("click", () => {
+            console.log("Minimize button clicked");
+            if (window.api) {
+              window.api.send("minimize-window");
+            } else {
+              // For development without Electron
+              alert("Minimize button clicked (would minimize the app in production)");
+            }
+          });
+
+        document
+          .getElementById("settings-btn")
+          ?.addEventListener("click", () => {
+            console.log("Settings button clicked");
+            switchTab('settings');
+            if (window.api) {
+              window.api.send("show-settings");
             }
           });
           
-          window.waveformAnimation = requestAnimationFrame(animate);
-        };
+        // Settings form handlers
+        document.getElementById("save-settings-btn")?.addEventListener("click", () => {
+          // Save settings logic would go here
+          document.getElementById("status").textContent = "Settings saved";
+          setTimeout(() => {
+            document.getElementById("status").textContent = "Ready";
+          }, 2000);
+        });
         
-        animate();
-      };
-      
-      if (micButton) {
-        micButton.addEventListener('click', toggleListening);
-      }
-      
-      if (genieContainer) {
-        genieContainer.addEventListener('click', toggleListening);
-      }
-      
-      // Handle window controls
-      document.getElementById('close-btn')?.addEventListener('click', () => {
-        if (window.api) {
-          window.api.send('close-window');
+        document.getElementById("reset-settings-btn")?.addEventListener("click", () => {
+          // Reset settings logic would go here
+          document.getElementById("status").textContent = "Settings reset";
+          setTimeout(() => {
+            document.getElementById("status").textContent = "Ready";
+          }, 2000);
+        });
+        
+        // Update sensitivity value display
+        const sensitivitySlider = document.getElementById("sensitivity");
+        const sensitivityValue = document.getElementById("sensitivity-value");
+        if (sensitivitySlider && sensitivityValue) {
+          sensitivitySlider.addEventListener("input", () => {
+            sensitivityValue.textContent = sensitivitySlider.value;
+          });
         }
+        
+        // Refresh devices button
+        document.getElementById("refresh-devices-btn")?.addEventListener("click", () => {
+          document.getElementById("status").textContent = "Refreshing devices...";
+          setTimeout(() => {
+            document.getElementById("status").textContent = "Ready";
+          }, 2000);
+        });
       });
-      
-      document.getElementById('minimize-btn')?.addEventListener('click', () => {
-        if (window.api) {
-          window.api.send('minimize-window');
-        }
-      });
-      
-      document.getElementById('settings-btn')?.addEventListener('click', () => {
-        if (window.api) {
-          window.api.send('show-settings');
-        }
-      });
-    });
-  </script>
-</body>
+    </script>
+  </body>
 </html>
