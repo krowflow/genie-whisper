@@ -33,10 +33,42 @@ A real-time voice-to-text transcription tool designed to work offline and online
    cd genie-whisper
    ```
 
-2. Install dependencies:
+2. Set up the environment and install dependencies:
+
+   **Windows**:
+   ```powershell
+   .\setup_env.ps1
+   ```
+
+   **Linux/macOS**:
    ```bash
+   chmod +x setup_env.sh
+   ./setup_env.sh
+   ```
+
+   This will:
+   - Create a virtual environment
+   - Install all required dependencies
+   - Run tests to verify the installation
+
+   **Manual Setup**:
+   ```bash
+   # Create virtual environment
+   python -m venv .venv
+   
+   # Activate virtual environment
+   # Windows:
+   .\.venv\Scripts\Activate.ps1
+   # Linux/macOS:
+   source .venv/bin/activate
+   
+   # Install dependencies
+   pip install -r tests/requirements-minimal.txt
+   pip install -r tests/requirements-whisper.txt
+   pip install torch torchaudio --index-url https://download.pytorch.org/whl/cpu
+   
+   # Install Node.js dependencies
    npm install
-   pip install -r requirements.txt
    ```
 
 3. Download models:
@@ -85,21 +117,30 @@ This will start the application in development mode with hot reloading.
 
 ## Testing
 
-### Audio Capture and Transcription
+The project includes comprehensive test scripts to verify the functionality of various components:
+
+### Running Tests
+
+Make sure your virtual environment is activated, then run:
 
 ```bash
-python python/test_audio.py
+# Test Whisper transcription
+python tests/test_whisper.py
+
+# Test Voice Activity Detection
+python tests/test_vad.py
+
+# Test IDE integration
+python tests/test_ide_integration.py
 ```
 
-This will test the audio capture, VAD, wake word detection, and transcription functionality.
+### Test Scripts
 
-### IDE Integration
+- **test_whisper.py**: Tests the Whisper transcription model loading and basic transcription
+- **test_vad.py**: Tests the Voice Activity Detection functionality
+- **test_ide_integration.py**: Tests the clipboard and IDE integration functionality
 
-```bash
-python python/test_ide_integration.py
-```
-
-This will test the IDE integration functionality.
+These tests help ensure that all components are working correctly and can be used to troubleshoot issues.
 
 ## Building
 
@@ -124,6 +165,7 @@ npm run make
 - `/scripts`: Build and utility scripts
 - `/docs`: Project documentation
 - `/memory-bank`: Roo Code memory bank files
+- `/tests`: Test scripts and testing utilities
 
 ## Contributing
 
