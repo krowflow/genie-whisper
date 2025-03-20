@@ -71,7 +71,7 @@ function createMainWindow() {
 
 // Create the system tray
 function createTray() {
-  tray = new Tray(path.join(__dirname, '../images/genie_without_background.png'));
+  tray = new Tray(path.join(__dirname, '../images/Genie.png'));
   
   const contextMenu = Menu.buildFromTemplate([
     { label: 'Show Genie Whisper', click: () => mainWindow.show() },

@@ -388,11 +388,192 @@ class WebRTCVAD:
             return audio  # Return original audio on error
 
 
+class HybridVAD:
+    """Hybrid Voice Activity Detection using both Silero and WebRTC VAD."""
+    
+    def __init__(
+        self,
+        silero_threshold: float = 0.5,
+        webrtc_aggressiveness: int = 3,
+        sample_rate: int = 16000,
+        frame_duration_ms: int = 30,
+        smoothing_window: int = 3,
+        min_speech_duration_ms: int = 250,
+        min_silence_duration_ms: int = 100
+    ):
+        """Initialize the Hybrid VAD.
+        
+        Args:
+            silero_threshold: Silero VAD threshold (0.0-1.0)
+            webrtc_aggressiveness: WebRTC VAD aggressiveness (0-3)
+            sample_rate: Audio sample rate in Hz
+            frame_duration_ms: Frame duration in milliseconds
+            smoothing_window: Number of frames to use for smoothing
+            min_speech_duration_ms: Minimum speech duration in milliseconds
+            min_silence_duration_ms: Minimum silence duration in milliseconds
+        """
+        self.sample_rate = sample_rate
+        self.frame_duration_ms = frame_duration_ms
+        self.smoothing_window = smoothing_window
+        self.min_speech_samples = int(min_speech_duration_ms * sample_rate / 1000)
+        self.min_silence_samples = int(min_silence_duration_ms * sample_rate / 1000)
+        
+        # Create both VAD instances
+        self.silero_vad = SileroVAD(threshold=silero_threshold, sample_rate=sample_rate)
+        self.webrtc_vad = WebRTCVAD(aggressiveness=webrtc_aggressiveness,
+                                    sample_rate=sample_rate,
+                                    frame_duration_ms=frame_duration_ms)
+        
+        logger.info(f"Hybrid VAD initialized with Silero threshold {silero_threshold} and WebRTC aggressiveness {webrtc_aggressiveness}")
+    
+    def is_speech(self, audio: np.ndarray) -> bool:
+        """Check if audio contains speech using both VADs.
+        
+        Args:
+            audio: Numpy array of audio samples
+            
+        Returns:
+            True if speech is detected, False otherwise
+        """
+        try:
+            # Get speech probability from both VADs
+            silero_speech = self.silero_vad.is_speech(audio)
+            webrtc_speech = self.webrtc_vad.is_speech(audio)
+            
+            # Consider it speech if either VAD detects speech
+            # This increases recall (fewer false negatives)
+            is_speech = silero_speech or webrtc_speech
+            
+            return is_speech
+            
+        except Exception as e:
+            logger.error(f"Error detecting speech in hybrid VAD: {e}")
+            return True  # Default to assuming speech on error
+    
+    def get_speech_segments(self, audio: np.ndarray) -> List[Tuple[int, int]]:
+        """Get speech segments from audio using both VADs.
+        
+        Args:
+            audio: Numpy array of audio samples
+            
+        Returns:
+            List of (start, end) tuples in samples
+        """
+        try:
+            # Get speech segments from both VADs
+            silero_segments = self.silero_vad.get_speech_segments(audio)
+            webrtc_segments = self.webrtc_vad.get_speech_segments(audio)
+            
+            # Merge segments
+            all_segments = silero_segments + webrtc_segments
+            
+            # Sort segments by start time
+            all_segments.sort(key=lambda x: x[0])
+            
+            # Merge overlapping segments
+            merged_segments = []
+            if all_segments:
+                current_start, current_end = all_segments[0]
+                
+                for start, end in all_segments[1:]:
+                    if start <= current_end:
+                        # Segments overlap, merge them
+                        current_end = max(current_end, end)
+                    else:
+                        # Check if segment is long enough
+                        if current_end - current_start >= self.min_speech_samples:
+                            merged_segments.append((current_start, current_end))
+                        
+                        # Start new segment
+                        current_start, current_end = start, end
+                
+                # Add the last segment if it's long enough
+                if current_end - current_start >= self.min_speech_samples:
+                    merged_segments.append((current_start, current_end))
+            
+            # Merge segments that are close together
+            smoothed_segments = []
+            if merged_segments:
+                current_start, current_end = merged_segments[0]
+                
+                for start, end in merged_segments[1:]:
+                    if start - current_end <= self.min_silence_samples:
+                        # Segments are close, merge them
+                        current_end = end
+                    else:
+                        # Add current segment
+                        smoothed_segments.append((current_start, current_end))
+                        
+                        # Start new segment
+                        current_start, current_end = start, end
+                
+                # Add the last segment
+                smoothed_segments.append((current_start, current_end))
+            
+            return smoothed_segments
+            
+        except Exception as e:
+            logger.error(f"Error getting speech segments in hybrid VAD: {e}")
+            return [(0, len(audio))]  # Default to full audio on error
+    
+    def filter_audio(self, audio: np.ndarray) -> np.ndarray:
+        """Filter audio to keep only speech segments.
+        
+        Args:
+            audio: Numpy array of audio samples
+            
+        Returns:
+            Filtered audio with only speech segments
+        """
+        try:
+            # Apply noise reduction preprocessing
+            audio = self._preprocess_audio(audio)
+            
+            # Get speech segments
+            segments = self.get_speech_segments(audio)
+            
+            # Concatenate speech segments
+            if segments:
+                speech_audio = np.concatenate([audio[start:end] for start, end in segments])
+                return speech_audio
+            else:
+                # No speech detected
+                return np.array([])
+            
+        except Exception as e:
+            logger.error(f"Error filtering audio in hybrid VAD: {e}")
+            return audio  # Return original audio on error
+    
+    def _preprocess_audio(self, audio: np.ndarray) -> np.ndarray:
+        """Preprocess audio to reduce noise.
+        
+        Args:
+            audio: Numpy array of audio samples
+            
+        Returns:
+            Preprocessed audio
+        """
+        try:
+            # Simple noise reduction by removing low amplitude signals
+            # Calculate noise floor as the 10th percentile of absolute amplitude
+            if len(audio) > 0:
+                noise_floor = np.percentile(np.abs(audio), 10)
+                
+                # Apply soft noise gate
+                audio = np.where(np.abs(audio) < noise_floor * 2, audio * 0.1, audio)
+            
+            return audio
+            
+        except Exception as e:
+            logger.error(f"Error preprocessing audio: {e}")
+            return audio  # Return original audio on error
+
+
 def create_vad(vad_type: str = "silero", **kwargs) -> Optional[object]:
     """Create a VAD instance.
     
     Args:
-        vad_type: Type of VAD to create ("silero" or "webrtc")
+        vad_type: Type of VAD to create ("silero", "webrtc", or "hybrid")
         **kwargs: Additional arguments for the VAD
         
     Returns:
@@ -403,6 +584,8 @@ def create_vad(vad_type: str = "silero", **kwargs) -> Optional[object]:
             return SileroVAD(**kwargs)
         elif vad_type.lower() == "webrtc":
             return WebRTCVAD(**kwargs)
+        elif vad_type.lower() == "hybrid":
+            return HybridVAD(**kwargs)
         else:
             logger.error(f"Unknown VAD type: {vad_type}")
             return None
