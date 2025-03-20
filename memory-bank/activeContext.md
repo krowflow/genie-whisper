@@ -62,7 +62,7 @@ We are currently in the **Backend Implementation and Integration phase** for Gen
    - Configure Focusrite Clarett 4 Pre as default audio device ✅
    - Optimize VAD for better noise filtering ✅
    - Improve wake word detection accuracy ✅
-   - Reduce transcription latency using GPU acceleration
+   - Reduce transcription latency using GPU acceleration ✅
    - Install required dependencies for Whisper and VAD models
 
 2. **Enhance UI experience**
