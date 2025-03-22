@@ -30,12 +30,14 @@ except ImportError as e:
     logger.error(f"Failed to import local modules: {e}")
     sys.exit(1)
 
-def test_ide_integration(text, ide=None, delay=3):
-    """Test IDE integration.
+def test_ide_integration(text, ide=None, language=None, context=None, delay=3):
+    """Test IDE integration with optional text formatting.
     
     Args:
         text: Text to inject
         ide: IDE to inject into (None for auto-detection)
+        language: Programming language for formatting (None for auto-detection)
+        context: Additional context for formatting (e.g., "function", "method", etc.)
         delay: Delay in seconds before injecting text
     
     Returns:
@@ -44,13 +46,22 @@ def test_ide_integration(text, ide=None, delay=3):
     try:
         logger.info(f"Testing IDE integration for {ide or 'auto-detected IDE'}...")
         logger.info(f"Text to inject: '{text}'")
+        
+        if language:
+            logger.info(f"Language for formatting: {language}")
+        else:
+            logger.info("Language will be auto-detected")
+            
+        if context:
+            logger.info(f"Context for formatting: {context}")
+            
         logger.info(f"Waiting {delay} seconds before injecting text...")
         
         # Wait for user to focus on the target application
         time.sleep(delay)
         
-        # Inject text
-        result = inject_text(text, ide)
+        # Inject text with formatting
+        result = inject_text(text, ide, language, context)
         
         logger.info(f"Text injection {'successful' if result else 'failed'}")
         
@@ -75,8 +86,26 @@ def main():
         "--ide",
         type=str,
         default=None,
-        choices=["vscode", "cursor", "roocode", "openai", None],
+        choices=["vscode", "cursor", "roocode", "openai", "jetbrains", "sublime", "atom",
+                "notepadplusplus", "visualstudio", "eclipse", None],
         help="IDE to inject into (None for auto-detection)"
+    )
+    
+    parser.add_argument(
+        "--language",
+        type=str,
+        default=None,
+        choices=["python", "javascript", "typescript", "java", "csharp", "cpp",
+                "go", "rust", "markdown", "html", "css", "sql", "shell", "plain", None],
+        help="Programming language for formatting (None for auto-detection)"
+    )
+    
+    parser.add_argument(
+        "--context",
+        type=str,
+        default=None,
+        choices=["function", "method", "class", "module", None],
+        help="Additional context for formatting"
     )
     
     parser.add_argument(
@@ -89,7 +118,7 @@ def main():
     args = parser.parse_args()
     
     # Test IDE integration
-    success = test_ide_integration(args.text, args.ide, args.delay)
+    success = test_ide_integration(args.text, args.ide, args.language, args.context, args.delay)
     
     if success:
         logger.info("IDE integration test successful")

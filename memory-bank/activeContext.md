@@ -1,4 +1,3 @@
-
 # Active Context: Genie Whisper
 
 ## Current Work Focus
@@ -58,6 +57,7 @@ We are currently in the **Backend Implementation and Integration phase** for Gen
 | 2025-03-20 | Enhanced Setup Script | Improved setup_env.ps1 with robust error handling, dependency verification, automatic recovery, and custom PyTorch installation script support |
 | 2025-03-20 | Integrated Dependency Management | Implemented comprehensive dependency management system with automatic recovery for seamless user experience |
 | 2025-03-20 | Enhanced UI Experience | Improved animations and visual feedback for Genie avatar, waveform visualization, and transcription preview |
+| 2025-03-22 | Enhanced IDE Integration | Added support for more IDEs (Notepad++, Visual Studio, Eclipse) and implemented text formatting for different languages |
 
 ## Next Steps
 
@@ -89,10 +89,10 @@ We are currently in the **Backend Implementation and Integration phase** for Gen
    - Improve visual feedback for different states ✅
    - Refine the waveform visualization ✅
 
-4. **Improve IDE integration**
-   - Test with different IDEs and text fields
-   - Add support for more applications
-   - Implement better text formatting
+4. **Improve IDE integration** ✅
+   - Test with different IDEs and text fields ✅
+   - Add support for more applications ✅
+   - Implement better text formatting ✅
 
 5. **Add comprehensive testing**
    - Create unit tests for core components
@@ -145,9 +145,9 @@ We are currently in the **Backend Implementation and Integration phase** for Gen
    - **Status**: Enhanced implementation with similarity matching and consecutive detection confirmation
 
 4. **IDE Integration**
-   - **Current Decision**: Using clipboard-based approach with fallback
+   - **Current Decision**: Using clipboard-based approach with fallback, added support for more IDEs and text formatting
    - **Considerations**: Compatibility, reliability, security
-   - **Status**: Basic implementation complete, need to test with more applications
+   - **Status**: Enhanced implementation with support for multiple IDEs and text formatting for different languages
 
 5. **Audio Device Selection**
    - **Current Decision**: Added support for selecting specific audio devices, configured Focusrite Clarett 4 Pre as default
@@ -228,6 +228,7 @@ We are currently in the **Backend Implementation and Integration phase** for Gen
 | **GPU Acceleration** | Implemented | Added support for NVIDIA GPUs, tested with RTX 4090 |
 | **Dependency Management** | Completed | Implemented comprehensive system with automatic recovery |
 | **UI Experience** | Enhanced | Improved animations and visual feedback for all components |
+| **IDE Integration** | Enhanced | Added support for more IDEs and text formatting |
 | **IDE Extensions** | Not Started | Will follow backend implementation |
 | **Build Configuration** | In Progress | Basic Electron setup complete |
 

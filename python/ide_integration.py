@@ -14,6 +14,20 @@ import platform
 import subprocess
 from typing import Optional, Dict, List, Any
 
+# Import text formatter
+try:
+    from python.text_formatter import format_text, detect_language
+except ImportError:
+    try:
+        from text_formatter import format_text, detect_language
+    except ImportError:
+        # Define fallback functions if text_formatter is not available
+        def format_text(text: str, language: str = "plain", context: Optional[str] = None) -> str:
+            return text
+        
+        def detect_language(text: str) -> str:
+            return "plain"
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
@@ -372,6 +386,169 @@ class FallbackIntegration(IDEIntegration):
         return self._simulate_clipboard(text)
 
 
+class JetBrainsIntegration(IDEIntegration):
+    """JetBrains IDEs integration (IntelliJ, PyCharm, WebStorm, etc.)."""
+    
+    def __init__(self):
+        """Initialize the JetBrains integration."""
+        super().__init__()
+        self.jetbrains_ides = [
+            "IntelliJ", "PyCharm", "WebStorm", "PhpStorm",
+            "Rider", "CLion", "GoLand", "RubyMine", "DataGrip"
+        ]
+    
+    def inject_text(self, text: str) -> bool:
+        """Inject text into JetBrains IDEs.
+        
+        Args:
+            text: Text to inject
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        # Check if any JetBrains IDE is active
+        window_title = self._get_active_window_title()
+        
+        for ide in self.jetbrains_ides:
+            if ide in window_title:
+                # JetBrains IDE is active, use clipboard method
+                logger.info(f"Detected JetBrains IDE: {ide}")
+                return self._simulate_clipboard(text)
+        
+        return False
+
+
+class SublimeTextIntegration(IDEIntegration):
+    """Sublime Text integration."""
+    
+    def __init__(self):
+        """Initialize the Sublime Text integration."""
+        super().__init__()
+    
+    def inject_text(self, text: str) -> bool:
+        """Inject text into Sublime Text.
+        
+        Args:
+            text: Text to inject
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        # Check if Sublime Text is active
+        window_title = self._get_active_window_title()
+        
+        if "Sublime Text" in window_title:
+            # Sublime Text is active, use clipboard method
+            return self._simulate_clipboard(text)
+        
+        return False
+
+
+class AtomIntegration(IDEIntegration):
+    """Atom integration."""
+    
+    def __init__(self):
+        """Initialize the Atom integration."""
+        super().__init__()
+    
+    def inject_text(self, text: str) -> bool:
+        """Inject text into Atom.
+        
+        Args:
+            text: Text to inject
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        # Check if Atom is active
+        window_title = self._get_active_window_title()
+        
+        if "Atom" in window_title:
+            # Atom is active, use clipboard method
+            return self._simulate_clipboard(text)
+        
+        return False
+
+
+class NotepadPlusPlusIntegration(IDEIntegration):
+    """Notepad++ integration."""
+    
+    def __init__(self):
+        """Initialize the Notepad++ integration."""
+        super().__init__()
+    
+    def inject_text(self, text: str) -> bool:
+        """Inject text into Notepad++.
+        
+        Args:
+            text: Text to inject
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        # Check if Notepad++ is active
+        window_title = self._get_active_window_title()
+        
+        if "Notepad++" in window_title:
+            # Notepad++ is active, use clipboard method
+            return self._simulate_clipboard(text)
+        
+        return False
+
+
+class VisualStudioIntegration(IDEIntegration):
+    """Visual Studio integration (not VS Code)."""
+    
+    def __init__(self):
+        """Initialize the Visual Studio integration."""
+        super().__init__()
+    
+    def inject_text(self, text: str) -> bool:
+        """Inject text into Visual Studio.
+        
+        Args:
+            text: Text to inject
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        # Check if Visual Studio is active
+        window_title = self._get_active_window_title()
+        
+        # Check for Visual Studio but not VS Code
+        if "Visual Studio" in window_title and "Code" not in window_title:
+            # Visual Studio is active, use clipboard method
+            return self._simulate_clipboard(text)
+        
+        return False
+
+
+class EclipseIntegration(IDEIntegration):
+    """Eclipse integration."""
+    
+    def __init__(self):
+        """Initialize the Eclipse integration."""
+        super().__init__()
+    
+    def inject_text(self, text: str) -> bool:
+        """Inject text into Eclipse.
+        
+        Args:
+            text: Text to inject
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        # Check if Eclipse is active
+        window_title = self._get_active_window_title()
+        
+        if "Eclipse" in window_title:
+            # Eclipse is active, use clipboard method
+            return self._simulate_clipboard(text)
+        
+        return False
+
+
 class IDEIntegrationManager:
     """Manager for IDE integrations."""
     
@@ -382,6 +559,12 @@ class IDEIntegrationManager:
             "cursor": CursorIntegration(),
             "roocode": RooCodeIntegration(),
             "openai": OpenAIChatIntegration(),
+            "jetbrains": JetBrainsIntegration(),
+            "sublime": SublimeTextIntegration(),
+            "atom": AtomIntegration(),
+            "notepadplusplus": NotepadPlusPlusIntegration(),
+            "visualstudio": VisualStudioIntegration(),
+            "eclipse": EclipseIntegration(),
             "fallback": FallbackIntegration()
         }
     
@@ -415,17 +598,28 @@ class IDEIntegrationManager:
 ide_manager = IDEIntegrationManager()
 
 
-def inject_text(text: str, ide: Optional[str] = None) -> bool:
-    """Inject text into the active IDE.
+def inject_text(text: str, ide: Optional[str] = None, language: Optional[str] = None, context: Optional[str] = None) -> bool:
+    """Inject text into the active IDE with optional formatting.
     
     Args:
         text: Text to inject
         ide: IDE to inject into (None for auto-detection)
+        language: Programming language for formatting (None for auto-detection)
+        context: Additional context for formatting (e.g., "function", "method", etc.)
         
     Returns:
         True if successful, False otherwise
     """
-    return ide_manager.inject_text(text, ide)
+    # Format text if language is specified or can be detected
+    if language is None:
+        # Try to detect language
+        language = detect_language(text)
+    
+    # Format text based on language and context
+    formatted_text = format_text(text, language, context)
+    
+    # Inject formatted text
+    return ide_manager.inject_text(formatted_text, ide)
 
 
 if __name__ == "__main__":
