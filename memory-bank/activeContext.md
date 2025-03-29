@@ -2,33 +2,50 @@
 
 ## Current Work Focus
 
-We are currently in the **Backend Implementation and Integration phase** for Genie Whisper. The primary focus is on:
+We are pivoting the Genie Whisper project to become a **full Jarvis-like voice assistant** that works globally across all applications on the PC. The primary focus is on:
 
-1. **Integrating the Python backend with the UI**
-   - Connecting the Electron frontend with the Python backend
-   - Implementing real-time audio capture and processing
-   - Setting up Whisper for transcription
-   - Implementing Voice Activity Detection for noise filtering
-   - Adding wake word detection for hands-free activation
-   - Optimizing for professional audio equipment (Focusrite Clarett 4 Pre, Shure SM7B)
-   - Leveraging GPU acceleration for faster transcription (RTX 4090)
+1. **Getting Basic Genie Whisper Working**
+   - Fixing the core audio pipeline
+   - Resolving Silero VAD model download issues (using WebRTC VAD as fallback)
+   - Implementing working audio capture from microphone
+   - Connecting to Whisper for transcription
+   - Creating a minimal viable product with system tray and global hotkey
+   - Adding text-to-speech capabilities for two-way voice interaction
 
-2. **Enhancing the UI experience**
-   - Refining the layout with Genie avatar, waveform, and microphone
-   - Implementing responsive design for different window sizes
-   - Adding visual feedback for different states (listening, processing, etc.)
-   - Ensuring smooth animations and transitions
+2. **Expanding to Jarvis-Like Functionality**
+   - Implementing command recognition system
+   - Adding global system integration
+   - Creating enhanced IDE integration for AI agent communication
+   - Implementing local knowledge base
+   - Building automation features
 
-3. **IDE Integration**
-   - Implementing text injection into different IDEs (VS Code, Cursor, Roo Code)
-   - Creating fallback mechanisms for unsupported applications
-   - Testing integration with different text fields and editors
+3. **Ensuring Cross-Platform Compatibility**
+   - Supporting Windows, macOS, and Linux
+   - Implementing platform-specific integrations
+   - Ensuring consistent experience across environments
+   - Optimizing for different hardware configurations
 
-4. **Testing and Optimization**
-   - Testing audio capture on different systems
-   - Optimizing transcription latency
+4. **Optimizing Performance and Usability**
+   - Minimizing latency in the transcription pipeline
    - Reducing resource usage
-   - Ensuring cross-platform compatibility
+   - Improving accuracy of speech recognition
+   - Enhancing user interface and experience
+
+## Technology Stack Decision
+
+After researching available technologies, we've decided to focus on currently available, proven technologies rather than speculating about future developments. Our core stack includes:
+
+1. **Speech Recognition**: OpenAI Whisper (local implementation)
+2. **Text-to-Speech**: 
+   - Primary option: Mozilla TTS (free, local, good documentation)
+   - Alternative option: Spark-TTS (higher quality, voice cloning, but more resource-intensive)
+3. **Voice Activity Detection**: Hybrid approach with WebRTC VAD and Silero VAD
+4. **Wake Word Detection**: Picovoice Porcupine (free tier)
+5. **System Integration**: Electron with Node.js
+6. **Local Knowledge**: SQLite with FTS5
+7. **AI Integration**: Direct API integration with Roo Code and other assistants
+
+This stack provides a solid foundation for a completely local, free, and powerful voice assistant.
 
 ## Recent Changes
 
@@ -58,72 +75,72 @@ We are currently in the **Backend Implementation and Integration phase** for Gen
 | 2025-03-20 | Integrated Dependency Management | Implemented comprehensive dependency management system with automatic recovery for seamless user experience |
 | 2025-03-20 | Enhanced UI Experience | Improved animations and visual feedback for Genie avatar, waveform visualization, and transcription preview |
 | 2025-03-22 | Enhanced IDE Integration | Added support for more IDEs (Notepad++, Visual Studio, Eclipse) and implemented text formatting for different languages |
+| 2025-03-29 | Silero VAD Model Issue | Identified issue with Silero VAD model download (404 and 401 errors), created alternative download script and documented the issue |
+| 2025-03-29 | Jarvis-Like Assistant Plan | Created comprehensive plan to transform Genie Whisper into a full Jarvis-like voice assistant with global system integration |
+| 2025-03-29 | Tech Stack Research | Documented current available technologies for implementing a Jarvis-like assistant |
+| 2025-03-29 | TTS Integration Analysis | Analyzed Mozilla TTS and Spark-TTS options for voice output capabilities |
 
 ## Next Steps
 
 ### Immediate Tasks (Next 1-2 Weeks)
-1. **Test and refine audio pipeline** (Current Focus)
-   - Test audio capture with test_microphone.py and test_transcription.py
-   - Fix microphone input detection and transcription preview display ✅
-   - Configure Focusrite Clarett 4 Pre as default audio device ✅
-   - Optimize VAD for better noise filtering ✅
-   - Improve wake word detection accuracy ✅
-   - Reduce transcription latency using GPU acceleration ✅
-   - Install required dependencies for Whisper and VAD models ✅
-   - Create test scripts for Whisper, VAD, and IDE integration ✅
-   - Implement PyTorch audio installation fix to resolve dependency issues while maintaining correct branch ✅
-   - Create test scripts for Whisper, VAD, and IDE integration ✅
-   - Fix IDE integration syntax errors ✅
-   - Install PyTorch with CUDA support for RTX 4090 ✅
-   - Enhance setup scripts with robust error handling and recovery ✅
+1. **Fix Core Audio Pipeline** (Current Focus)
+   - Resolve Silero VAD model download issues (use WebRTC VAD as fallback) ✅
+   - Implement working audio capture from microphone
+   - Connect to Whisper for transcription
+   - Create basic preview display
+   - Implement text output to active application
 
-2. **Implement integrated dependency management** ✅
-   - Add dependency verification at application startup ✅
-   - Implement automatic recovery for dependency issues ✅
-   - Ensure consistent environment across development and production ✅
-   - Integrate best practices from documentation into the application ✅
+2. **Add Text-to-Speech Capabilities**
+   - Integrate Mozilla TTS as primary TTS engine
+   - Create voice selection system
+   - Implement speech output pipeline
+   - Test voice quality and latency
+   - Add response generation system
+   - Design pluggable architecture to support future Spark-TTS integration
 
-3. **Enhance UI experience** ✅
-   - Implement advanced Genie animations ✅
-   - Add visual effects for the Genie avatar ✅
-   - Improve visual feedback for different states ✅
-   - Refine the waveform visualization ✅
+3. **Create Minimal Viable Product**
+   - Implement system tray application
+   - Add global hotkey activation
+   - Create floating UI with microphone button
+   - Implement basic settings (microphone selection, model selection)
+   - Add clipboard integration for universal compatibility
 
-4. **Improve IDE integration** ✅
-   - Test with different IDEs and text fields ✅
-   - Add support for more applications ✅
-   - Implement better text formatting ✅
-
-5. **Add comprehensive testing**
-   - Create unit tests for core components
-   - Implement integration tests for the audio pipeline
-   - Test on different platforms (Windows, macOS, Linux)
+4. **Test Basic Functionality**
+   - Test with different microphones
+   - Test in different applications
+   - Measure transcription accuracy
+   - Optimize for latency
+   - Fix critical bugs
 
 ### Short-Term Goals (Next 3-4 Weeks)
 
-1. **Complete Phase 1 implementation**
-   - Finalize core functionality
-   - Ensure stability and reliability
-   - Optimize performance
-   - Implement integrated dependency management based on best practices ✅
-   - Enhance UI experience with advanced animations and visual feedback ✅
+1. **Implement Command Recognition System**
+   - Create command parsing from transcribed text
+   - Build command registry system
+   - Add built-in commands for system control
+   - Implement context-aware command execution
+   - Add custom command creation
 
-2. **Start Phase 2 enhancements**
-   - Implement advanced UI features
-   - Add more customization options
-   - Improve user experience
+2. **Begin AI Agent Integration**
+   - Research Roo Code API integration
+   - Create proof-of-concept for voice commands to AI
+   - Implement basic context passing
+   - Test with simple AI interactions
+   - Add voice responses from AI agents
 
-3. **Prepare for production**
-   - Create installers for different platforms
-   - Set up auto-updates
-   - Add telemetry (opt-in)
-   - Ensure robust dependency handling across all platforms ✅
+3. **Add Global System Integration**
+   - Implement application launching
+   - Add file and folder operations
+   - Create system settings control
+   - Implement media playback control
+   - Add window management functions
 
-4. **Documentation and user guides**
-   - Create user documentation
-   - Add tooltips and help sections
-   - Create video tutorials
-   - Include troubleshooting guides for common issues
+4. **Create Desktop Hub Implementation**
+   - Create central configuration system
+   - Implement system status monitoring
+   - Add notification center integration
+   - Create cross-application context awareness
+   - Implement device discovery for future expansion
 
 ## Active Decisions and Considerations
 
@@ -138,6 +155,7 @@ We are currently in the **Backend Implementation and Integration phase** for Gen
    - **Current Decision**: Using hybrid approach with both Silero VAD and WebRTC VAD for enhanced noise filtering
    - **Considerations**: Accuracy, performance, resource usage
    - **Status**: Implemented enhanced hybrid approach, merging speech segments from both VADs for better accuracy
+   - **New Issue**: Silero VAD model download failing with 404/401 errors, need to find alternative source or implement fallback
 
 3. **Wake Word Detection**
    - **Current Decision**: Using enhanced Whisper for wake word detection with similarity matching, with improved Porcupine as fallback
@@ -169,12 +187,25 @@ We are currently in the **Backend Implementation and Integration phase** for Gen
    - **Considerations**: Performance, visual appeal, user experience
    - **Status**: Implemented advanced animations with dynamic effects and improved visual feedback
 
+9. **Text-to-Speech Engine** (Updated)
+   - **Current Decision**: Primary implementation with Mozilla TTS, design for future Spark-TTS integration
+   - **Considerations**: 
+     - Mozilla TTS: Good quality, better documentation, lower resources, limited languages
+     - Spark-TTS: Excellent quality, voice cloning, higher resources, limited to English/Chinese
+   - **Status**: Analyzed options, created integration plan with pluggable architecture
+
+10. **System Integration Framework** (New)
+    - **Current Decision**: Using Electron with Node.js for cross-platform compatibility
+    - **Considerations**: Performance, resource usage, development speed
+    - **Status**: Planning phase, evaluating implementation approach
+
 ### Open Questions
 
 1. **Performance Optimization**
    - How to best utilize the RTX 4090 for transcription?
    - What's the optimal buffer size for high-quality audio input?
    - How to balance transcription accuracy vs. speed?
+   - How to manage resource sharing between STT and TTS on GPU?
 
 2. **UI/UX Refinement**
    - What additional customization options would be useful for users?
@@ -185,6 +216,21 @@ We are currently in the **Backend Implementation and Integration phase** for Gen
    - How to ensure consistent behavior across different operating systems?
    - What platform-specific issues need to be addressed?
    - How to handle different audio APIs on different platforms?
+
+4. **System Integration** (New)
+   - What's the best approach for global system control?
+   - How to handle security and permissions?
+   - What level of system access is appropriate?
+
+5. **AI Agent Communication** (New)
+   - How to design an effective voice interface for AI agents?
+   - What context information is most valuable to pass to AI?
+   - How to format voice responses from AI agents?
+
+6. **TTS Voice Selection** (New)
+   - Which voices provide the best balance of quality and performance?
+   - Should we allow users to create custom voices with Spark-TTS in the future?
+   - How to handle multilingual support with limited language models?
 
 ### Current Challenges
 
@@ -202,11 +248,13 @@ We are currently in the **Backend Implementation and Integration phase** for Gen
    - Minimizing CPU and memory usage
    - Optimizing for battery life on laptops
    - Ensuring smooth performance on lower-end systems
+   - Balancing resources between STT and TTS components
 
 4. **Audio Quality**
    - Ensuring optimal audio capture from professional microphones
    - Handling different audio interfaces and settings
    - Optimizing for different voice types and environments
+   - Producing natural-sounding TTS output
 
 5. **Dependency Management** (Completed)
    - ~~Resolving PyTorch audio installation issues~~ ✅
@@ -216,6 +264,21 @@ We are currently in the **Backend Implementation and Integration phase** for Gen
    - ~~Maintaining consistent development environment across team members~~ ✅
    - ~~Implementing integrated dependency management based on best practices~~ ✅
    - ~~Ensuring robust error handling and recovery for dependency issues~~ ✅
+
+6. **Silero VAD Model Availability** (New)
+   - Silero VAD model download failing with 404/401 errors
+   - Repository URLs have changed or access has been restricted
+   - Need to find alternative sources or implement fallback mechanisms
+   - Created alternative download script with multiple source attempts
+   - May need to consider bundling the model with the application
+
+7. **Text-to-Speech Integration** (New)
+   - Selecting appropriate TTS engine
+   - Ensuring natural-sounding voice output
+   - Minimizing latency for conversational interaction
+   - Handling different languages and accents
+   - Managing voice resources efficiently
+   - Creating pluggable architecture for future enhancements
 
 ## Development Environment Status
 
@@ -231,16 +294,23 @@ We are currently in the **Backend Implementation and Integration phase** for Gen
 | **IDE Integration** | Enhanced | Added support for more IDEs and text formatting |
 | **IDE Extensions** | Not Started | Will follow backend implementation |
 | **Build Configuration** | In Progress | Basic Electron setup complete |
+| **Text-to-Speech** | Researched | Analyzed Mozilla TTS and Spark-TTS options |
+| **Global System Integration** | Not Started | Planned for short-term implementation |
+| **AI Agent Communication** | Not Started | Planned for short-term implementation |
+| **Local Knowledge Base** | Not Started | Planned for medium-term implementation |
 
 ## Team Focus
 
 | Team Member | Current Focus | Next Up |
 |-------------|--------------|---------|
-| **Lead Developer** | Backend integration | Testing and optimization |
-| **Frontend Developer** | UI refinement | Advanced animations |
-| **ML Engineer** | Whisper optimization | Wake word improvement |
-| **DevOps** | Build configuration | CI/CD pipeline setup |
+| **Lead Developer** | Core Audio Pipeline | Text-to-Speech Integration |
+| **Frontend Developer** | UI refinement | System Tray Application |
+| **ML Engineer** | Whisper optimization | TTS Implementation |
+| **DevOps** | Build configuration | Cross-platform support |
 
 ## Current Blockers
 
-- None at this stage - Backend implementation in progress
+- Silero VAD model download failing with 404/401 errors (Workaround implemented: WebRTC VAD fallback)
+- No working end-to-end functionality yet (Next focus: Create minimal viable product)
+- Need to implement text-to-speech capabilities (Researched options: Mozilla TTS and Spark-TTS)
+- Need to implement global system integration (Planned for short-term implementation)
