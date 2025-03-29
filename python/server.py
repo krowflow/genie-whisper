@@ -13,7 +13,13 @@ import os
 import sys
 import threading
 import time
-from typing import Dict, List, Optional, Union
+import json
+import hashlib
+import pickle
+from datetime import datetime
+from collections import OrderedDict
+from typing import Dict, List, Optional, Union, Tuple, Any, Set
+from difflib import SequenceMatcher
 
 # Configure logging
 logging.basicConfig(
@@ -139,15 +145,17 @@ except ImportError as e:
 class AudioProcessor:
     """Handles audio capture and processing."""
     
-    def __init__(self, sample_rate: int = 16000, chunk_size: int = 4000, device_id: Optional[int] = None):
+    def __init__(self, sample_rate: int = 16000, chunk_size: int = 4000, device_id: Optional[int] = None, gain: float = 1.0):
         """Initialize the audio processor.
         
         Args:
             sample_rate: Audio sample rate in Hz
             chunk_size: Number of samples per chunk
             device_id: Audio device ID (None for default)
+            gain: Audio gain multiplier (default: 1.0)
         """
         self.sample_rate = sample_rate
+        self.gain = gain
         self.chunk_size = chunk_size
         self.device_id = device_id
         self.audio_buffer = []
@@ -252,8 +260,11 @@ class AudioProcessor:
         if status:
             logger.warning(f"Audio callback status: {status}")
         
+        # Apply gain to the audio data
+        amplified_data = indata.copy() * self.gain
+        
         # Add audio chunk to buffer
-        self.audio_buffer.append(indata.copy())
+        self.audio_buffer.append(amplified_data)
         
         # Enhanced speech detection using both VADs if available
         if self.silero_vad and self.webrtc_vad:
@@ -365,11 +376,12 @@ class AudioProcessor:
         
         return devices
     
-    def set_device(self, device_id: int) -> bool:
+    def set_device(self, device_id: int, gain: Optional[float] = None) -> bool:
         """Set the audio device.
         
         Args:
             device_id: Audio device ID
+            gain: Optional new gain value
             
         Returns:
             True if successful, False otherwise
@@ -383,6 +395,12 @@ class AudioProcessor:
             
             # Set device
             self.device_id = device_id
+            
+            # Update gain if provided
+            if gain is not None:
+                self.gain = gain
+                logger.info(f"Audio gain set to: {self.gain}")
+            
             logger.info(f"Audio device set to: {devices[device_id]['name']} (ID: {device_id})")
             
             return True
@@ -390,6 +408,405 @@ class AudioProcessor:
         except Exception as e:
             logger.error(f"Error setting audio device: {e}")
             return False
+
+
+class TranscriptionCache:
+    """Enhanced caching system for transcriptions with smarter phrase matching and optimization."""
+    
+    def __init__(self, max_size: int = 200, similarity_threshold: float = 0.85, 
+                 persistent_path: Optional[str] = None):
+        """Initialize the transcription cache with smart features.
+        
+        Args:
+            max_size: Maximum number of entries in the cache
+            similarity_threshold: Threshold for text similarity matching (0.0-1.0)
+            persistent_path: File path for persistent cache storage (None for in-memory only)
+        """
+        # Main cache using OrderedDict to track usage order
+        self.cache = OrderedDict()
+        
+        # Phrase-based cache for common phrases
+        self.phrase_cache = {}
+        
+        # Audio fingerprint cache for similar audio
+        self.audio_fingerprint_cache = {}
+        
+        # Keep track of common phrases for optimization
+        self.phrase_frequency = {}
+        
+        # Configuration
+        self.max_size = max_size
+        self.similarity_threshold = similarity_threshold
+        self.persistent_path = persistent_path
+        
+        # Statistics
+        self.cache_hits = 0
+        self.phrase_hits = 0
+        self.similarity_hits = 0
+        self.audio_hits = 0
+        self.total_lookups = 0
+        self.hit_ratio = 0.0
+        
+        # Load persistent cache if available
+        if persistent_path and os.path.exists(persistent_path):
+            self._load_persistent_cache()
+            
+        # Create context-based common phrases
+        self._initialize_common_phrases()
+    
+    def _initialize_common_phrases(self):
+        """Initialize cache with common programming and voice command phrases."""
+        common_phrases = [
+            # Common programming phrases
+            "import numpy as np",
+            "import torch",
+            "import tensorflow as tf",
+            "def __init__(self):",
+            "return result",
+            "if __name__ == '__main__':",
+            # Common voice commands
+            "new function",
+            "new class",
+            "create variable",
+            "add comment",
+            "delete line",
+            "save file",
+            "run program",
+            "stop program",
+            "import library"
+        ]
+        
+        for phrase in common_phrases:
+            # Add to phrase cache with empty audio fingerprint
+            phrase_hash = self._hash_text(phrase)
+            self.phrase_cache[phrase_hash] = phrase
+            self.phrase_frequency[phrase_hash] = 1
+    
+    def _hash_text(self, text: str) -> str:
+        """Create a hash from text for efficient lookup.
+        
+        Args:
+            text: Text to hash
+            
+        Returns:
+            Hash string
+        """
+        return hashlib.md5(text.encode('utf-8')).hexdigest()
+    
+    def _hash_audio(self, audio: np.ndarray) -> str:
+        """Create a hash from audio data for efficient lookup.
+        
+        Args:
+            audio: Audio data
+            
+        Returns:
+            Hash string
+        """
+        # Use downsample to create a more general fingerprint
+        # This allows similar audio inputs to match
+        if len(audio) > 1600:  # Ensure audio is long enough
+            downsampled = audio[::10]  # Take every 10th sample
+            # Round values to reduce precision for better matching
+            rounded = np.round(downsampled * 10) / 10
+            return hashlib.md5(rounded.tobytes()).hexdigest()
+        return hashlib.md5(audio.tobytes()).hexdigest()
+    
+    def _compute_audio_fingerprint(self, audio: np.ndarray) -> Dict[str, float]:
+        """Compute audio fingerprint features for similarity detection.
+        
+        Args:
+            audio: Audio data
+            
+        Returns:
+            Dictionary of audio features
+        """
+        if len(audio) == 0:
+            return {}
+            
+        # Extract basic audio features
+        features = {
+            'length': len(audio),
+            'mean': float(np.mean(audio)),
+            'std': float(np.std(audio)),
+            'max': float(np.max(audio)),
+            'min': float(np.min(audio)),
+            'energy': float(np.sum(audio**2)),
+            # More advanced features could be added here
+        }
+        
+        # Add spectral features if audio is long enough
+        if len(audio) > 1600:
+            # Compute frequency features
+            try:
+                from scipy import signal
+                frequencies, power = signal.periodogram(audio, fs=16000)
+                features['peak_freq'] = float(frequencies[np.argmax(power)])
+                features['spectral_centroid'] = float(np.sum(frequencies * power) / np.sum(power) if np.sum(power) > 0 else 0)
+            except ImportError:
+                # Skip spectral features if scipy not available
+                pass
+                
+        return features
+    
+    def _calculate_text_similarity(self, text1: str, text2: str) -> float:
+        """Calculate similarity between two text strings.
+        
+        Args:
+            text1: First text
+            text2: Second text
+            
+        Returns:
+            Similarity score (0.0-1.0)
+        """
+        # Use SequenceMatcher for better string comparison
+        return SequenceMatcher(None, text1.lower(), text2.lower()).ratio()
+    
+    def _calculate_audio_similarity(self, features1: Dict[str, float], features2: Dict[str, float]) -> float:
+        """Calculate similarity between two audio fingerprints.
+        
+        Args:
+            features1: First audio features
+            features2: Second audio features
+            
+        Returns:
+            Similarity score (0.0-1.0)
+        """
+        if not features1 or not features2:
+            return 0.0
+            
+        # Calculate similarity based on features
+        try:
+            length_similarity = min(features1['length'], features2['length']) / max(features1['length'], features2['length'])
+            mean_similarity = 1.0 - min(1.0, abs(features1['mean'] - features2['mean']) / max(0.01, max(abs(features1['mean']), abs(features2['mean']))))
+            std_similarity = 1.0 - min(1.0, abs(features1['std'] - features2['std']) / max(0.01, max(features1['std'], features2['std'])))
+            energy_similarity = min(features1['energy'], features2['energy']) / max(0.01, max(features1['energy'], features2['energy']))
+            
+            # Weighted combination
+            similarity = (length_similarity * 0.1 + 
+                         mean_similarity * 0.3 + 
+                         std_similarity * 0.3 + 
+                         energy_similarity * 0.3)
+                         
+            # Include spectral features if available
+            if 'peak_freq' in features1 and 'peak_freq' in features2:
+                peak_freq_similarity = 1.0 - min(1.0, abs(features1['peak_freq'] - features2['peak_freq']) / max(1.0, max(features1['peak_freq'], features2['peak_freq'])))
+                similarity = similarity * 0.8 + peak_freq_similarity * 0.2
+                
+            return min(1.0, max(0.0, similarity))
+        except (KeyError, ZeroDivisionError):
+            return 0.0
+    
+    def _load_persistent_cache(self):
+        """Load cache from disk."""
+        try:
+            with open(self.persistent_path, 'rb') as f:
+                data = pickle.load(f)
+                self.cache = data.get('cache', OrderedDict())
+                self.phrase_cache = data.get('phrase_cache', {})
+                self.audio_fingerprint_cache = data.get('audio_fingerprint_cache', {})
+                self.phrase_frequency = data.get('phrase_frequency', {})
+                self.cache_hits = data.get('cache_hits', 0)
+                self.phrase_hits = data.get('phrase_hits', 0)
+                self.similarity_hits = data.get('similarity_hits', 0)
+                self.audio_hits = data.get('audio_hits', 0)
+                self.total_lookups = data.get('total_lookups', 0)
+                logger.info(f"Loaded cache with {len(self.cache)} entries from {self.persistent_path}")
+        except Exception as e:
+            logger.error(f"Error loading cache from {self.persistent_path}: {e}")
+            # Reset caches
+            self.cache = OrderedDict()
+            self.phrase_cache = {}
+            self.audio_fingerprint_cache = {}
+    
+    def _save_persistent_cache(self):
+        """Save cache to disk."""
+        if not self.persistent_path:
+            return
+            
+        try:
+            # Create directory if it doesn't exist
+            os.makedirs(os.path.dirname(self.persistent_path), exist_ok=True)
+            
+            # Prepare data to save
+            data = {
+                'cache': self.cache,
+                'phrase_cache': self.phrase_cache,
+                'audio_fingerprint_cache': self.audio_fingerprint_cache,
+                'phrase_frequency': self.phrase_frequency,
+                'cache_hits': self.cache_hits,
+                'phrase_hits': self.phrase_hits,
+                'similarity_hits': self.similarity_hits,
+                'audio_hits': self.audio_hits,
+                'total_lookups': self.total_lookups,
+                'timestamp': datetime.now().isoformat()
+            }
+            
+            # Save to file
+            with open(self.persistent_path, 'wb') as f:
+                pickle.dump(data, f)
+                
+            logger.info(f"Saved cache with {len(self.cache)} entries to {self.persistent_path}")
+            
+        except Exception as e:
+            logger.error(f"Error saving cache to {self.persistent_path}: {e}")
+    
+    def get(self, audio: np.ndarray) -> Optional[str]:
+        """Get transcription from cache with smart matching.
+        
+        Args:
+            audio: Audio array
+            
+        Returns:
+            Cached transcription or None if not found
+        """
+        self.total_lookups += 1
+        
+        # Try exact audio match first (fastest)
+        audio_hash = hashlib.md5(audio.tobytes()).hexdigest()
+        if audio_hash in self.cache:
+            self.cache_hits += 1
+            self.hit_ratio = (self.cache_hits + self.phrase_hits + self.similarity_hits + self.audio_hits) / self.total_lookups
+            
+            # Move to end of OrderedDict to mark as recently used
+            text = self.cache[audio_hash]
+            self.cache.move_to_end(audio_hash)
+            
+            logger.info(f"Exact cache hit (total hits: {self.cache_hits}, ratio: {self.hit_ratio:.2f})")
+            return text
+        
+        # Compute audio fingerprint for similarity matching
+        audio_fingerprint = self._compute_audio_fingerprint(audio)
+        
+        # Try similarity-based matching
+        for stored_hash, features in self.audio_fingerprint_cache.items():
+            similarity = self._calculate_audio_similarity(audio_fingerprint, features)
+            
+            if similarity >= self.similarity_threshold:
+                self.audio_hits += 1
+                self.hit_ratio = (self.cache_hits + self.phrase_hits + self.similarity_hits + self.audio_hits) / self.total_lookups
+                
+                logger.info(f"Audio similarity cache hit (similarity: {similarity:.2f}, hits: {self.audio_hits}, ratio: {self.hit_ratio:.2f})")
+                return self.cache[stored_hash]
+        
+        return None
+    
+    def get_by_text(self, text: str) -> Optional[str]:
+        """Get most similar text from cache.
+        
+        Args:
+            text: Query text
+            
+        Returns:
+            Most similar cached text or None if no match
+        """
+        # Try phrase cache first (exact matches of common phrases)
+        text_hash = self._hash_text(text)
+        if text_hash in self.phrase_cache:
+            self.phrase_hits += 1
+            logger.info(f"Phrase cache hit (hits: {self.phrase_hits})")
+            return self.phrase_cache[text_hash]
+        
+        # Try similarity-based text matching
+        if self.cache:
+            best_match = None
+            best_similarity = 0.0
+            
+            for audio_hash, cached_text in self.cache.items():
+                similarity = self._calculate_text_similarity(text, cached_text)
+                
+                if similarity > best_similarity and similarity >= self.similarity_threshold:
+                    best_similarity = similarity
+                    best_match = cached_text
+            
+            if best_match:
+                self.similarity_hits += 1
+                logger.info(f"Text similarity cache hit (similarity: {best_similarity:.2f}, hits: {self.similarity_hits})")
+                return best_match
+        
+        return None
+    
+    def set(self, audio: np.ndarray, text: str) -> None:
+        """Add or update a cache entry.
+        
+        Args:
+            audio: Audio array
+            text: Transcribed text
+        """
+        # Store in main cache
+        audio_hash = hashlib.md5(audio.tobytes()).hexdigest()
+        self.cache[audio_hash] = text
+        
+        # Store audio fingerprint
+        self.audio_fingerprint_cache[audio_hash] = self._compute_audio_fingerprint(audio)
+        
+        # Update phrase frequency
+        text_hash = self._hash_text(text)
+        self.phrase_frequency[text_hash] = self.phrase_frequency.get(text_hash, 0) + 1
+        
+        # Store common phrases in phrase cache
+        if self.phrase_frequency[text_hash] >= 3:
+            self.phrase_cache[text_hash] = text
+        
+        # Limit cache size
+        self._enforce_size_limit()
+        
+        # Periodically save to disk if persistent
+        if self.persistent_path and self.total_lookups % 50 == 0:
+            self._save_persistent_cache()
+    
+    def _enforce_size_limit(self) -> None:
+        """Enforce cache size limit by removing least recently used items."""
+        # Check main cache
+        while len(self.cache) > self.max_size:
+            # Remove oldest item (first item in OrderedDict)
+            audio_hash, _ = self.cache.popitem(last=False)
+            
+            # Also remove from fingerprint cache
+            if audio_hash in self.audio_fingerprint_cache:
+                del self.audio_fingerprint_cache[audio_hash]
+                
+        # Limit phrase cache to most frequent items
+        if len(self.phrase_cache) > self.max_size / 2:
+            # Sort phrases by frequency
+            sorted_phrases = sorted(self.phrase_frequency.items(), key=lambda x: x[1], reverse=True)
+            
+            # Keep only the top half
+            keep_phrases = set(item[0] for item in sorted_phrases[:int(self.max_size / 2)])
+            
+            # Filter phrase cache
+            self.phrase_cache = {k: v for k, v in self.phrase_cache.items() if k in keep_phrases}
+    
+    def get_stats(self) -> Dict[str, Any]:
+        """Get cache statistics.
+        
+        Returns:
+            Dictionary of cache statistics
+        """
+        return {
+            'size': len(self.cache),
+            'phrase_cache_size': len(self.phrase_cache),
+            'fingerprint_cache_size': len(self.audio_fingerprint_cache),
+            'cache_hits': self.cache_hits,
+            'phrase_hits': self.phrase_hits,
+            'similarity_hits': self.similarity_hits,
+            'audio_hits': self.audio_hits,
+            'total_lookups': self.total_lookups,
+            'hit_ratio': self.hit_ratio,
+            'common_phrases': len(self.phrase_frequency),
+            'persistent': bool(self.persistent_path)
+        }
+    
+    def clear(self) -> None:
+        """Clear the cache."""
+        self.cache.clear()
+        self.audio_fingerprint_cache.clear()
+        # Keep phrase cache for common phrases
+        self.total_lookups = 0
+        self.cache_hits = 0
+        self.phrase_hits = 0
+        self.similarity_hits = 0
+        self.audio_hits = 0
+        self.hit_ratio = 0.0
 
 
 class WhisperTranscriber:
@@ -459,9 +876,15 @@ class WhisperTranscriber:
         
         self.model = None
         
-        # Cache for repeated phrases to avoid redundant processing
-        self.transcription_cache = {}
-        self.cache_hits = 0
+        # Initialize enhanced transcription cache with persistent storage
+        cache_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "cache")
+        cache_file = os.path.join(cache_dir, f"transcription_cache_{model_size}.pkl")
+        self.cache = TranscriptionCache(
+            max_size=500,  # Larger cache size for better performance
+            similarity_threshold=0.85,
+            persistent_path=cache_file
+        )
+        logger.info(f"Initialized enhanced transcription cache with persistent storage at {cache_file}")
         
         # Performance metrics
         self.total_transcription_time = 0
@@ -512,7 +935,7 @@ class WhisperTranscriber:
             self.model = None
     
     def transcribe(self, audio: np.ndarray, language: Optional[str] = None) -> str:
-        """Transcribe audio using Whisper with optimized parameters.
+        """Transcribe audio using Whisper with optimized parameters and enhanced caching.
         
         Args:
             audio: Numpy array of audio samples
@@ -530,30 +953,86 @@ class WhisperTranscriber:
             return ""
         
         try:
-            # Check cache for similar audio (simple hash-based caching)
-            audio_hash = hash(audio.tobytes())
-            if audio_hash in self.transcription_cache:
-                self.cache_hits += 1
-                logger.info(f"Using cached transcription (hits: {self.cache_hits})")
-                return self.transcription_cache[audio_hash]
+            # Check enhanced cache system for similar audio
+            cached_text = self.cache.get(audio)
+            if cached_text:
+                # Use text formatter to clean up cached text if needed
+                try:
+                    from text_formatter import format_text, detect_language
+                    detected_lang = detect_language(cached_text)
+                    if detected_lang != "plain":
+                        cached_text = format_text(cached_text, detected_lang)
+                except ImportError:
+                    pass
+                
+                logger.info(f"Using enhanced cached transcription")
+                return cached_text
             
             logger.info("Transcribing audio...")
             start_time = time.time()
             
-            # Optimize transcription parameters based on device
-            beam_size = 3 if self.device == "cuda" else 1  # Smaller beam size for faster processing
+            # Optimize transcription parameters based on device and model size
+            # Adjust beam size based on GPU memory and model size
+            if self.device == "cuda":
+                try:
+                    import torch
+                    gpu_memory = torch.cuda.get_device_properties(0).total_memory / (1024**3)
+                    
+                    # RTX 4090 optimization
+                    is_rtx_4090 = "4090" in torch.cuda.get_device_name(0)
+                    
+                    if is_rtx_4090:
+                        logger.info("Optimizing for RTX 4090 GPU")
+                        # RTX 4090 has enough memory for larger beam sizes with all models
+                        if self.model_size in ["large"]:
+                            beam_size = 5  # Maximum quality for large model
+                        else:
+                            beam_size = 8  # Larger beam size for smaller models
+                    elif gpu_memory > 10:  # More than 10GB VRAM
+                        beam_size = 5 if self.model_size in ["tiny", "base", "small"] else 3
+                    elif gpu_memory > 6:   # 6-10GB VRAM
+                        beam_size = 3
+                    else:                  # <6GB VRAM
+                        beam_size = 2
+                except Exception:
+                    # Default if we can't determine
+                    beam_size = 3
+            else:
+                # CPU processing - use smaller beam for faster results
+                beam_size = 1
             
-            # Transcribe audio with optimized parameters
+            logger.debug(f"Using beam size: {beam_size} for model: {self.model_size} on {self.device}")
+            
+            # Dynamic VAD parameters based on audio characteristics
+            audio_power = np.mean(np.abs(audio))
+            is_quiet_audio = audio_power < 0.01
+            vad_threshold = 0.3 if is_quiet_audio else 0.5  # Lower threshold for quiet audio
+            
+            # Check for wake word to use as initial prompt for better context
+            initial_prompt = None
+            try:
+                # Try to get the most similar text from cache for context
+                similar_text = self.cache.get_by_text("")  # This will return the most common phrase
+                if similar_text:
+                    # Use the similar text as initial prompt if it might be related
+                    initial_prompt = similar_text
+                    logger.debug(f"Using context from cache as initial prompt: {initial_prompt}")
+            except Exception as e:
+                logger.debug(f"Error getting initial prompt: {e}")
+            
+            # Optimized parameters for RTX 4090 and other GPUs
             segments, info = self.model.transcribe(
                 audio,
                 language=language,
                 beam_size=beam_size,
                 vad_filter=True,
-                vad_parameters={"threshold": 0.5},  # Optimize VAD for speed
-                condition_on_previous_text=False,   # Faster processing
-                compression_ratio_threshold=2.4,    # Optimize for speed
-                log_prob_threshold=-1.0,            # Optimize for speed
-                no_speech_threshold=0.6             # Optimize for speed
+                vad_parameters={"threshold": vad_threshold},  # Dynamic threshold
+                condition_on_previous_text=True if initial_prompt else False,  # Use context if available
+                compression_ratio_threshold=2.4,        # Optimize for speed
+                log_prob_threshold=-1.0,                # Optimize for speed
+                no_speech_threshold=0.6,                # Optimize for speed
+                initial_prompt=initial_prompt,          # Use context from cache if available
+                word_timestamps=False                   # Disable word timestamps for speed
             )
             
             # Combine segments
@@ -566,14 +1045,18 @@ class WhisperTranscriber:
             self.transcription_count += 1
             avg_time = self.total_transcription_time / self.transcription_count
             
-            # Cache the result
-            self.transcription_cache[audio_hash] = text
+            # Use text formatter to format the text based on content
+            try:
+                from text_formatter import format_text, detect_language
+                detected_lang = detect_language(text)
+                if detected_lang != "plain":
+                    text = format_text(text, detected_lang)
+                    logger.debug(f"Formatted transcription as {detected_lang}")
+            except ImportError:
+                pass
             
-            # Limit cache size to prevent memory issues
-            if len(self.transcription_cache) > 100:
-                # Remove oldest entries
-                for _ in range(10):
-                    self.transcription_cache.pop(next(iter(self.transcription_cache)))
+            # Store in enhanced cache
+            self.cache.set(audio, text)
             
             logger.info(f"Transcription complete: {text}")
             logger.info(f"Transcription time: {transcription_time:.2f}s (avg: {avg_time:.2f}s)")
@@ -589,15 +1072,32 @@ class WhisperTranscriber:
         Returns:
             Dictionary with performance statistics
         """
-        return {
+        # Get basic stats
+        stats = {
             "model_size": self.model_size,
             "device": self.device,
             "compute_type": self.compute_type,
             "avg_transcription_time": self.total_transcription_time / max(1, self.transcription_count),
             "transcription_count": self.transcription_count,
-            "cache_hits": self.cache_hits,
-            "cache_size": len(self.transcription_cache)
         }
+        
+        # Add enhanced cache stats
+        cache_stats = self.cache.get_stats()
+        stats.update({
+            "cache_hits_total": cache_stats["cache_hits"] + cache_stats["phrase_hits"] + 
+                               cache_stats["similarity_hits"] + cache_stats["audio_hits"],
+            "cache_hit_ratio": cache_stats["hit_ratio"],
+            "cache_size": cache_stats["size"],
+            "cache_exact_hits": cache_stats["cache_hits"],
+            "cache_phrase_hits": cache_stats["phrase_hits"],
+            "cache_similarity_hits": cache_stats["similarity_hits"],
+            "cache_audio_hits": cache_stats["audio_hits"],
+            "phrase_cache_size": cache_stats["phrase_cache_size"],
+            "cache_lookups": cache_stats["total_lookups"],
+            "cache_persistent": cache_stats["persistent"]
+        })
+        
+        return stats
 
 
 class GenieWhisperServer:
@@ -625,8 +1125,18 @@ class GenieWhisperServer:
         else:
             self.device = "cpu"
         
-        # Initialize components
-        self.audio_processor = AudioProcessor(device_id=self.device_id)
+        # Initialize audio processor with default device first and increased gain
+        self.audio_processor = AudioProcessor(device_id=self.device_id, gain=5.0)  # Increase gain by 5x
+        
+        # Then find and set Focusrite device if available
+        focusrite_id = self._find_focusrite_device()
+        if focusrite_id is not None:
+            logger.info(f"Using Focusrite audio interface (ID: {focusrite_id})")
+            self.device_id = focusrite_id
+            # Update the audio processor with the Focusrite device and increased gain
+            self.audio_processor.set_device(focusrite_id, gain=5.0)  # Increase gain by 5x
+        else:
+            logger.warning("Focusrite audio interface not found, using specified device ID")
         self.transcriber = WhisperTranscriber(
             model_size=self.model_size,
             device=self.device,
@@ -652,6 +1162,22 @@ class GenieWhisperServer:
         # State
         self.is_listening = False
         self.wake_word_active = False
+    
+    def _find_focusrite_device(self) -> Optional[int]:
+        """Find the Focusrite audio interface device ID.
+        
+        Returns:
+            Device ID if found, None otherwise
+        """
+        devices = self.audio_processor.get_audio_devices()
+        
+        # Look for Focusrite or Clarett in device names
+        for device in devices:
+            if 'focusrite' in device['name'].lower() or 'clarett' in device['name'].lower():
+                logger.info(f"Found Focusrite device: {device['name']} (ID: {device['id']})")
+                return device['id']
+        
+        return None
     
     def _is_gpu_available(self) -> bool:
         """Check if GPU is available.
@@ -862,9 +1388,9 @@ class GenieWhisperServer:
                     self._inject_text(text, self.ide)
     
     def _transcription_loop(self) -> None:
-        """Continuously transcribe audio while listening with optimized performance."""
+        """Continuously transcribe audio while listening with optimized performance and caching."""
         # Adaptive sleep time based on device
-        sleep_time = 0.5 if self.device == "cuda" else 1.0
+        sleep_time = 0.5 if self.transcriber.device == "cuda" else 1.0
         
         # Minimum audio length for transcription (to avoid processing very short segments)
         min_audio_length = 0.5 * self.audio_processor.sample_rate
@@ -874,6 +1400,10 @@ class GenieWhisperServer:
         
         # Performance tracking
         transcription_times = []
+        
+        # Cache for recent audio segments to prevent repetitive processing
+        recent_audio_segments = []
+        max_recent_segments = 5
         
         while self.is_listening:
             start_time = time.time()
@@ -904,8 +1434,44 @@ class GenieWhisperServer:
                     time.sleep(sleep_time)
                     continue
             
+            # Check for repetitive audio (avoid processing the same segment repeatedly)
+            is_repetitive = False
+            if recent_audio_segments:
+                for recent_audio in recent_audio_segments:
+                    # Only compare if they have similar lengths
+                    if 0.8 <= len(audio) / len(recent_audio) <= 1.2:
+                        # Compare audio fingerprints
+                        similarity = np.corrcoef(
+                            np.abs(audio[:min(len(audio), len(recent_audio))]), 
+                            np.abs(recent_audio[:min(len(audio), len(recent_audio))])
+                        )[0, 1]
+                        
+                        if similarity > 0.95:  # Very similar audio
+                            is_repetitive = True
+                            logger.debug(f"Skipping repetitive audio segment (similarity: {similarity:.2f})")
+                            break
+            
+            if is_repetitive:
+                time.sleep(sleep_time)
+                continue
+                
+            # Add to recent segments
+            recent_audio_segments.append(audio)
+            if len(recent_audio_segments) > max_recent_segments:
+                recent_audio_segments.pop(0)
+            
+            # Get cache stats before transcription
+            cache_stats_before = self.transcriber.cache.get_stats()
+            
             # Transcribe audio
             text = self.transcriber.transcribe(audio)
+            
+            # Get cache stats after transcription to see if we had a hit
+            cache_stats_after = self.transcriber.cache.get_stats()
+            cache_hit = (cache_stats_after['cache_hits'] + cache_stats_after['phrase_hits'] + 
+                         cache_stats_after['similarity_hits'] + cache_stats_after['audio_hits'] > 
+                         cache_stats_before['cache_hits'] + cache_stats_before['phrase_hits'] + 
+                         cache_stats_before['similarity_hits'] + cache_stats_before['audio_hits'])
             
             # Track transcription time
             transcription_time = time.time() - start_time
@@ -918,8 +1484,11 @@ class GenieWhisperServer:
             # Calculate average transcription time
             avg_time = sum(transcription_times) / len(transcription_times)
             
-            # Adjust sleep time based on transcription performance
-            if avg_time < 0.5:
+            # Adjust sleep time based on transcription performance and cache hits
+            if cache_hit:
+                # Cache hits are fast, we can process more frequently
+                sleep_time = max(0.1, sleep_time * 0.8)
+            elif avg_time < 0.5:
                 # Fast transcription, can process more frequently
                 sleep_time = max(0.2, sleep_time * 0.9)
             else:
@@ -928,18 +1497,25 @@ class GenieWhisperServer:
             
             # Send transcription result
             if text:
+                # Get cache stats
+                cache_stats = self.transcriber.cache.get_stats()
+                
                 self._send_message({
                     "type": "transcription",
                     "text": text,
                     "final": False,
                     "performance": {
                         "transcription_time": transcription_time,
-                        "avg_time": avg_time
+                        "avg_time": avg_time,
+                        "cached": cache_hit,
+                        "cache_hit_ratio": cache_stats["hit_ratio"]
                     }
                 })
                 
                 # Log performance
-                logger.debug(f"Transcription time: {transcription_time:.2f}s, avg: {avg_time:.2f}s, sleep: {sleep_time:.2f}s")
+                logger.debug(f"Transcription time: {transcription_time:.2f}s, avg: {avg_time:.2f}s, " +
+                           f"sleep: {sleep_time:.2f}s, cached: {cache_hit}, " +
+                           f"hit ratio: {cache_stats['hit_ratio']:.2f}")
             
             # Adaptive sleep based on performance
             time.sleep(sleep_time)
