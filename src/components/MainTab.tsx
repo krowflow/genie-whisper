@@ -61,12 +61,10 @@ const MainTab: React.FC<MainTabProps> = ({
 
   return (
     <div className="flex-grow flex flex-col">
-      {/* Transcription preview (only shown when there's transcription) */}
-      {showTranscription && transcription && (
-        <div className="w-full mb-4">
-          <TranscriptionPreview text={transcription} isListening={isListening} />
-        </div>
-      )}
+      {/* Transcription preview (always shown) */}
+      <div className="w-full mb-4">
+        <TranscriptionPreview text={transcription} isListening={isListening} />
+      </div>
       
       {/* Main UI area with Genie on left, waveform in center, mic on right */}
       <div className="flex-grow flex flex-col justify-center">
