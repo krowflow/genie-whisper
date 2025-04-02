@@ -5,10 +5,10 @@
 We are pivoting the Genie Whisper project to become a **full Jarvis-like voice assistant** that works globally across all applications on the PC. The primary focus is on:
 
 1. **Getting Basic Genie Whisper Working**
-   - Fixing the core audio pipeline
-   - Resolving Silero VAD model download issues (using WebRTC VAD as fallback)
-   - Implementing working audio capture from microphone
-   - Connecting to Whisper for transcription
+   - Fixing the core audio pipeline (Backend real-time loop implemented)
+   - Resolving Silero VAD model download issues (using WebRTC VAD as fallback) ✅
+   - Implementing working audio capture from microphone (Implemented via queue in AudioProcessor) ✅
+   - Connecting to Whisper for transcription (Integrated into real-time loop) ✅
    - Creating a minimal viable product with system tray and global hotkey
    - Adding text-to-speech capabilities for two-way voice interaction
 
@@ -79,16 +79,17 @@ This stack provides a solid foundation for a completely local, free, and powerfu
 | 2025-03-29 | Jarvis-Like Assistant Plan | Created comprehensive plan to transform Genie Whisper into a full Jarvis-like voice assistant with global system integration |
 | 2025-03-29 | Tech Stack Research | Documented current available technologies for implementing a Jarvis-like assistant |
 | 2025-03-29 | TTS Integration Analysis | Analyzed Mozilla TTS and Spark-TTS options for voice output capabilities |
+| 2025-04-02 | Real-Time Audio Pipeline | Refactored AudioProcessor to use queue; Implemented real-time transcription loop in server.py with silence detection and wake word handling. |
 
 ## Next Steps
 
 ### Immediate Tasks (Next 1-2 Weeks)
-1. **Fix Core Audio Pipeline** (Current Focus)
+1. **Fix Core Audio Pipeline** (Backend Complete, Needs Integration)
    - Resolve Silero VAD model download issues (use WebRTC VAD as fallback) ✅
-   - Implement working audio capture from microphone
-   - Connect to Whisper for transcription
-   - Create basic preview display
-   - Implement text output to active application
+   - Implement working audio capture from microphone ✅ (Backend logic done)
+   - Connect to Whisper for transcription ✅ (Backend logic done)
+   - Create basic preview display (Frontend task)
+   - Implement text output to active application ✅ (Backend logic done via _inject_text)
 
 2. **Add Text-to-Speech Capabilities**
    - Integrate Mozilla TTS as primary TTS engine
@@ -311,6 +312,6 @@ This stack provides a solid foundation for a completely local, free, and powerfu
 ## Current Blockers
 
 - Silero VAD model download failing with 404/401 errors (Workaround implemented: WebRTC VAD fallback)
-- No working end-to-end functionality yet (Next focus: Create minimal viable product)
+- End-to-end functionality requires frontend integration (Backend audio pipeline implemented)
 - Need to implement text-to-speech capabilities (Researched options: Mozilla TTS and Spark-TTS)
 - Need to implement global system integration (Planned for short-term implementation)
