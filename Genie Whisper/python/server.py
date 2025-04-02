@@ -158,7 +158,7 @@ class AudioProcessor:
         self.gain = gain
         self.chunk_size = chunk_size
         self.device_id = device_id
-        self.audio_buffer = []
+        self.audio_queue = queue.Queue() # Use a queue for real-time chunk processing
         self.is_recording = False
         self.recording_thread = None
         
@@ -198,7 +198,7 @@ class AudioProcessor:
             return
         
         self.is_recording = True
-        self.audio_buffer = []
+        self.audio_queue = queue.Queue() # Clear queue on start
         
         def record_audio():
             """Record audio in a separate thread."""
@@ -229,12 +229,8 @@ class AudioProcessor:
         self.recording_thread.daemon = True
         self.recording_thread.start()
     
-    def stop_recording(self) -> np.ndarray:
-        """Stop recording and return the recorded audio.
-        
-        Returns:
-            Numpy array of audio samples
-        """
+    def stop_recording(self) -> None:
+        """Stop recording audio."""
         if not self.is_recording:
             logger.warning("Not recording")
             return np.array([])
@@ -246,14 +242,8 @@ class AudioProcessor:
             self.recording_thread.join(timeout=1.0)
             self.recording_thread = None
         
-        # Combine all audio chunks
-        if not self.audio_buffer:
-            return np.array([])
-        
-        audio = np.concatenate(self.audio_buffer)
-        self.audio_buffer = []
-        
-        return audio
+        # No need to return audio, chunks are processed via queue
+        logger.info("Audio recording stopped.")
     
     def _audio_callback(self, indata, frames, time, status):
         """Callback for audio stream."""
@@ -263,8 +253,8 @@ class AudioProcessor:
         # Apply gain to the audio data
         amplified_data = indata.copy() * self.gain
         
-        # Add audio chunk to buffer
-        self.audio_buffer.append(amplified_data)
+        # Put audio chunk into the queue for processing
+        self.audio_queue.put(amplified_data)
         
         # Enhanced speech detection using both VADs if available
         if self.silero_vad and self.webrtc_vad:
@@ -408,6 +398,24 @@ class AudioProcessor:
         except Exception as e:
             logger.error(f"Error setting audio device: {e}")
             return False
+
+    def get_audio_chunk(self, timeout=0.1) -> Optional[np.ndarray]:
+        """Retrieves an audio chunk from the queue.
+
+        Args:
+            timeout (float): Maximum time to wait for an item in seconds.
+
+        Returns:
+            np.ndarray or None: An audio chunk as a NumPy array, or None if the queue is empty.
+        """
+        try:
+            return self.audio_queue.get(timeout=timeout)
+        except queue.Empty:
+            return None
+
+    def is_running(self) -> bool:
+        """Returns True if audio capture is currently active."""
+        return self.is_recording
 
 
 class TranscriptionCache:
@@ -1162,7 +1170,17 @@ class GenieWhisperServer:
         # State
         self.is_listening = False
         self.wake_word_active = False
-    
+
+        # Real-time processing state variables
+        self.silence_threshold_ms = getattr(args, 'silence_threshold_ms', 1000) # Default 1 second
+        self.wake_word_timeout_ms = getattr(args, 'wake_word_timeout_ms', 5000) # Default 5 seconds
+        self.reset_wake_word_after_silence = getattr(args, 'reset_wake_word', True) # Default True
+
+        self.speech_active = False
+        self.accumulated_audio = []
+        self.last_speech_time = 0
+        self.wake_word_detected = False # Will be True only if wake word mode is active and word is heard
+        self.speech_started_time = 0 # To track timeout after wake word
     def _find_focusrite_device(self) -> Optional[int]:
         """Find the Focusrite audio interface device ID.
         
@@ -1388,137 +1406,145 @@ class GenieWhisperServer:
                     self._inject_text(text, self.ide)
     
     def _transcription_loop(self) -> None:
-        """Continuously transcribe audio while listening with optimized performance and caching."""
-        # Adaptive sleep time based on device
-        sleep_time = 0.5 if self.transcriber.device == "cuda" else 1.0
-        
-        # Minimum audio length for transcription (to avoid processing very short segments)
-        min_audio_length = 0.5 * self.audio_processor.sample_rate
-        
-        # Last transcription time for adaptive processing
-        last_transcription_time = time.time()
-        
-        # Performance tracking
-        transcription_times = []
-        
-        # Cache for recent audio segments to prevent repetitive processing
-        recent_audio_segments = []
-        max_recent_segments = 5
-        
+        """Continuously processes audio chunks for transcription with silence detection."""
+        logger.info("Starting real-time transcription loop...")
+
+        # Reset state variables at the start of the loop
+        self.speech_active = False
+        self.accumulated_audio = []
+        self.last_speech_time = time.time() # Initialize last speech time
+        # Reset wake word detected state based on activation mode
+        self.wake_word_detected = self.activation_mode != "wake_word"
+        self.speech_started_time = 0
+
+        if self.activation_mode == "wake_word":
+             self._send_message({"type": "status", "data": "listening_for_wake_word"})
+        else:
+             self._send_message({"type": "status", "data": "listening_continuously"})
+
+
         while self.is_listening:
-            start_time = time.time()
-            
-            # Get current audio buffer (copy)
-            if not self.audio_processor.audio_buffer:
-                time.sleep(sleep_time)
-                continue
-                
-            audio = np.concatenate(self.audio_processor.audio_buffer)
-            
-            # Skip if audio is too short
-            if len(audio) < min_audio_length:
-                time.sleep(sleep_time)
-                continue
-            
-            # Filter audio with VAD if enabled
-            if self.use_vad:
-                # Use enhanced VAD filtering
-                filtered_audio = self.audio_processor.filter_audio(audio)
-                
-                # Check if we have any speech after filtering
-                if len(filtered_audio) > 0:
-                    audio = filtered_audio
+            # Get audio chunk from the queue
+            current_chunk = self.audio_processor.get_audio_chunk(timeout=0.1) # Short timeout
+
+            if current_chunk is not None:
+                # --- Wake Word Detection ---
+                if self.activation_mode == "wake_word" and not self.wake_word_detected:
+                    if self.wake_word_detector and self.wake_word_detector.detect(current_chunk):
+                        logger.info("Wake word detected!")
+                        self.wake_word_detected = True
+                        self.speech_started_time = time.time() # Start speech timer on wake word
+                        self.accumulated_audio = [] # Reset buffer on wake word
+                        self.speech_active = False # Reset speech active flag
+                        self.last_speech_time = time.time() # Reset silence timer
+                        self._send_message({"type": "status", "data": "wake_word_detected"})
+                        # Skip processing this chunk as it was the wake word
+                        continue
+                    else:
+                        # If in wake word mode but not detected, discard chunk and continue waiting
+                        continue # Go to next loop iteration to get next chunk
+
+                # --- VAD and Speech Accumulation ---
+                is_speech = False
+                if self.use_vad and self.audio_processor.vad:
+                    try:
+                        # Assuming VAD works on chunks directly
+                        is_speech = self.audio_processor.vad.is_speech(current_chunk.squeeze())
+                    except Exception as e:
+                        logger.error(f"Error during VAD processing in loop: {e}")
                 else:
-                    # No speech detected, skip transcription
-                    logger.debug("No speech detected in current buffer, skipping transcription")
-                    time.sleep(sleep_time)
-                    continue
-            
-            # Check for repetitive audio (avoid processing the same segment repeatedly)
-            is_repetitive = False
-            if recent_audio_segments:
-                for recent_audio in recent_audio_segments:
-                    # Only compare if they have similar lengths
-                    if 0.8 <= len(audio) / len(recent_audio) <= 1.2:
-                        # Compare audio fingerprints
-                        similarity = np.corrcoef(
-                            np.abs(audio[:min(len(audio), len(recent_audio))]), 
-                            np.abs(recent_audio[:min(len(audio), len(recent_audio))])
-                        )[0, 1]
-                        
-                        if similarity > 0.95:  # Very similar audio
-                            is_repetitive = True
-                            logger.debug(f"Skipping repetitive audio segment (similarity: {similarity:.2f})")
-                            break
-            
-            if is_repetitive:
-                time.sleep(sleep_time)
-                continue
-                
-            # Add to recent segments
-            recent_audio_segments.append(audio)
-            if len(recent_audio_segments) > max_recent_segments:
-                recent_audio_segments.pop(0)
-            
-            # Get cache stats before transcription
-            cache_stats_before = self.transcriber.cache.get_stats()
-            
-            # Transcribe audio
-            text = self.transcriber.transcribe(audio)
-            
-            # Get cache stats after transcription to see if we had a hit
-            cache_stats_after = self.transcriber.cache.get_stats()
-            cache_hit = (cache_stats_after['cache_hits'] + cache_stats_after['phrase_hits'] + 
-                         cache_stats_after['similarity_hits'] + cache_stats_after['audio_hits'] > 
-                         cache_stats_before['cache_hits'] + cache_stats_before['phrase_hits'] + 
-                         cache_stats_before['similarity_hits'] + cache_stats_before['audio_hits'])
-            
-            # Track transcription time
-            transcription_time = time.time() - start_time
-            transcription_times.append(transcription_time)
-            
-            # Keep only the last 10 times for adaptive sleep
-            if len(transcription_times) > 10:
-                transcription_times.pop(0)
-            
-            # Calculate average transcription time
-            avg_time = sum(transcription_times) / len(transcription_times)
-            
-            # Adjust sleep time based on transcription performance and cache hits
-            if cache_hit:
-                # Cache hits are fast, we can process more frequently
-                sleep_time = max(0.1, sleep_time * 0.8)
-            elif avg_time < 0.5:
-                # Fast transcription, can process more frequently
-                sleep_time = max(0.2, sleep_time * 0.9)
-            else:
-                # Slow transcription, reduce frequency
-                sleep_time = min(1.5, sleep_time * 1.1)
-            
-            # Send transcription result
-            if text:
-                # Get cache stats
-                cache_stats = self.transcriber.cache.get_stats()
-                
-                self._send_message({
-                    "type": "transcription",
-                    "text": text,
-                    "final": False,
-                    "performance": {
-                        "transcription_time": transcription_time,
-                        "avg_time": avg_time,
-                        "cached": cache_hit,
-                        "cache_hit_ratio": cache_stats["hit_ratio"]
-                    }
-                })
-                
-                # Log performance
-                logger.debug(f"Transcription time: {transcription_time:.2f}s, avg: {avg_time:.2f}s, " +
-                           f"sleep: {sleep_time:.2f}s, cached: {cache_hit}, " +
-                           f"hit ratio: {cache_stats['hit_ratio']:.2f}")
-            
-            # Adaptive sleep based on performance
-            time.sleep(sleep_time)
+                    # If VAD is disabled, treat every chunk as speech
+                    is_speech = True
+
+                if is_speech:
+                    if not self.speech_active:
+                        logger.debug("Speech started.")
+                        self.speech_active = True
+                        # Optionally capture timestamp of speech start
+                        # self.speech_started_time = time.time() # Reset this? Or keep from wake word?
+                    self.accumulated_audio.append(current_chunk)
+                    self.last_speech_time = time.time()
+                elif self.speech_active:
+                    # Speech was active, now silence or VAD says no speech
+                    self.accumulated_audio.append(current_chunk) # Include potentially trailing silence chunk
+                    silence_duration = time.time() - self.last_speech_time
+                    logger.debug(f"Silence detected. Duration: {silence_duration:.2f}s")
+
+                    # Check if silence duration exceeds threshold
+                    if silence_duration > self.silence_threshold_ms / 1000.0:
+                        logger.info(f"Significant silence ({silence_duration:.2f}s) detected after speech. Processing accumulated audio.")
+                        self._process_accumulated_audio() # Process the audio
+                        # State reset happens within _process_accumulated_audio
+
+            # --- Timeout Checks ---
+            else: # current_chunk is None (queue was empty)
+                # Check if speech was active but we haven't received data or speech for a while
+                if self.speech_active and (time.time() - self.last_speech_time > self.silence_threshold_ms / 1000.0):
+                    logger.info(f"Processing accumulated audio due to timeout after speech ({time.time() - self.last_speech_time:.2f}s).")
+                    self._process_accumulated_audio() # Process the audio
+
+                # Check for timeout after wake word detection if no speech started
+                if self.activation_mode == "wake_word" and self.wake_word_detected and not self.speech_active and \
+                   (time.time() - self.speech_started_time > self.wake_word_timeout_ms / 1000.0):
+                    logger.info("Timeout waiting for speech after wake word.")
+                    self.wake_word_detected = False # Reset wake word
+                    self._send_message({"type": "status", "data": "listening_for_wake_word"}) # Inform frontend
+
+            # Small sleep to prevent high CPU usage when queue is empty frequently
+            time.sleep(0.01)
+
+        logger.info("Transcription loop finished.")
+        # Process any remaining audio when listening stops
+        if self.accumulated_audio:
+             logger.info("Processing remaining accumulated audio after loop exit.")
+             self._process_accumulated_audio()
+
+
+    def _process_accumulated_audio(self):
+        """Helper function to process accumulated audio, transcribe, and reset state."""
+        if not self.accumulated_audio:
+            logger.debug("No accumulated audio to process.")
+            # Reset state even if buffer is empty after silence trigger
+            self.speech_active = False
+            if self.activation_mode == "wake_word" and self.reset_wake_word_after_silence:
+                self.wake_word_detected = False
+                self._send_message({"type": "status", "data": "listening_for_wake_word"})
+            return
+
+        try:
+            # Combine accumulated chunks
+            audio_to_process = np.concatenate(self.accumulated_audio)
+            audio_duration = len(audio_to_process) / self.audio_processor.sample_rate
+            logger.info(f"Processing {audio_duration:.2f}s of accumulated audio...")
+
+            # --- Transcription ---
+            start_transcribe_time = time.time()
+            # Optional: Filter the combined audio again if needed
+            # filtered_audio = self.audio_processor.filter_audio(audio_to_process)
+            # transcription = self.transcriber.transcribe(filtered_audio)
+            transcription = self.transcriber.transcribe(audio_to_process)
+            end_transcribe_time = time.time()
+            logger.info(f"Transcription: '{transcription}' (took {end_transcribe_time - start_transcribe_time:.2f}s)")
+
+            if transcription.strip():
+                # Send transcription to frontend/IDE
+                self._send_message({"type": "transcription", "data": transcription, "final": True}) # Mark as final
+                self._inject_text(transcription) # Inject into IDE
+
+                # Add to cache
+                self.cache.set(audio_to_process, transcription) # Use the cache object from __init__
+
+        except Exception as e:
+            logger.error(f"Error during transcription processing: {e}")
+        finally:
+            # --- Reset State ---
+            self.accumulated_audio = []
+            self.speech_active = False
+            # Reset wake word detection if necessary
+            if self.activation_mode == "wake_word" and self.reset_wake_word_after_silence:
+                logger.info("Resetting wake word detection after processing.")
+                self.wake_word_detected = False
+                self._send_message({"type": "status", "data": "listening_for_wake_word"})
     
     def _start_wake_word_detection(self) -> None:
         """Start wake word detection."""
@@ -1767,6 +1793,27 @@ def parse_args():
         default="auto",
         choices=["auto", "int8", "float16", "float32"],
         help="Compute type for Whisper model"
+    )
+
+    parser.add_argument(
+        "--silence-threshold-ms",
+        type=int,
+        default=1000,
+        help="Duration of silence in milliseconds after speech to trigger transcription"
+    )
+
+    parser.add_argument(
+        "--wake-word-timeout-ms",
+        type=int,
+        default=5000,
+        help="Duration in milliseconds to wait for speech after wake word detection before resetting"
+    )
+
+    parser.add_argument(
+        "--reset-wake-word",
+        type=lambda x: x.lower() == "true",
+        default=True,
+        help="Reset wake word detection after processing transcription following silence"
     )
     
     return parser.parse_args()
