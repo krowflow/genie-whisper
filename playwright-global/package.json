@@ -2,15 +2,16 @@
   "name": "playwright-global-tools",
   "version": "1.0.0",
   "description": "Comprehensive Playwright tool suite for global use across projects",
-  "main": "dist/tools/index.js",
-  "types": "dist/tools/index.d.ts",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "scripts": {
     "build": "tsc",
     "test": "playwright test",
     "lint": "eslint . --ext .ts",
     "format": "prettier --write \"**/*.ts\"",
     "prepare": "npm run build",
-    "install-browsers": "npx playwright install"
+    "install-browsers": "npx playwright install",
+    "docs": "typedoc --out docs tools"
   },
   "keywords": [
     "playwright",
@@ -24,22 +25,23 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
-    "@playwright/test": "^1.32.0",
-    "axe-core": "^4.6.3",
-    "chart.js": "^4.2.1",
-    "pdfjs-dist": "^3.4.120"
+    "@playwright/test": "^1.40.0",
+    "axe-core": "^4.8.2",
+    "chart.js": "^4.4.0",
+    "pdfjs-dist": "^3.11.174"
   },
   "devDependencies": {
-    "@types/node": "^18.15.11",
-    "@typescript-eslint/eslint-plugin": "^5.57.1",
-    "@typescript-eslint/parser": "^5.57.1",
-    "eslint": "^8.37.0",
-    "eslint-config-prettier": "^8.8.0",
-    "eslint-plugin-prettier": "^4.2.1",
-    "prettier": "^2.8.7",
-    "typescript": "^5.0.3"
+    "@types/node": "^20.9.0",
+    "@typescript-eslint/eslint-plugin": "^6.10.0",
+    "@typescript-eslint/parser": "^6.10.0",
+    "eslint": "^8.53.0",
+    "eslint-config-prettier": "^9.0.0",
+    "eslint-plugin-prettier": "^5.0.1",
+    "prettier": "^3.0.3",
+    "typedoc": "^0.25.3",
+    "typescript": "^5.2.2"
   },
   "peerDependencies": {
-    "playwright": "^1.32.0"
+    "playwright": "^1.40.0"
   }
 }
