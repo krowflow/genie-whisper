@@ -8,22 +8,21 @@ A real-time voice-to-text transcription tool designed to work offline and online
 
 - **Real-Time Speech-to-Text**: Converts voice input into text using OpenAI Whisper
 - **Offline & Online Mode**: Runs locally, with optional cloud-based fallback
-- **Global UI Overlay**: Toggleable UI overlay that works across PC, Cursor, VS Code IDEs
+- **Global UI Overlay**: Toggleable HUD that works across PC, Cursor, VS Code IDEs
 - **Intelligent Speech Filtering**: Uses Voice Activity Detection (VAD) to ignore background noise
-- **Live Waveform Visualization**: Displays real-time waveform during speech
-- **Animated Genie Avatar**: A dynamic avatar that "speaks" transcribed text
-- **Hotkey & Wake Word Activation**: Allows push-to-talk, wake-word mode, or always-on transcription
-- **Direct IDE Integration**: Seamlessly injects text into Cursor, VS Code, Roo Code, and OpenAI chat UI
+- **Live Waveform Visualization**: (Planned) Displays real-time waveform during speech
+- **Animated Genie Avatar**: (Planned) Dynamic avatar that reacts during speech
+- **Hotkey & Wake Word Activation**: Push-to-talk, wake-word mode, or always-on transcription
+- **Direct IDE Integration**: (Planned) Inject text into Cursor, VS Code, Roo Code, and OpenAI chat
 - **Minimal Latency**: Optimized for fast transcription with lightweight models
-- **System Tray & Toggle Control**: UI settings panel to enable/disable transcription and configure settings
+- **System Tray & Toggle Control**: Control transcription and settings easily
 
 ## Installation
 
 ### Prerequisites
-
-- Node.js (for Electron)
-- Python 3.9+ (for Whisper backend)
-- FFmpeg (for audio processing)
+- Node.js (v18+)
+- Python 3.9+
+- FFmpeg
 
 ### Setup
 
@@ -33,7 +32,7 @@ A real-time voice-to-text transcription tool designed to work offline and online
    cd genie-whisper
    ```
 
-2. Set up the environment and install dependencies:
+2. Set up environment and install dependencies:
 
    **Windows**:
    ```powershell
@@ -46,32 +45,23 @@ A real-time voice-to-text transcription tool designed to work offline and online
    ./setup_env.sh
    ```
 
-   This will:
-   - Create a virtual environment
-   - Install all required dependencies
-   - Run tests to verify the installation
-
    **Manual Setup**:
    ```bash
-   # Create virtual environment
    python -m venv .venv
-   
    # Activate virtual environment
    # Windows:
    .\.venv\Scripts\Activate.ps1
    # Linux/macOS:
    source .venv/bin/activate
-   
-   # Install dependencies
+
    pip install -r tests/requirements-minimal.txt
    pip install -r tests/requirements-whisper.txt
    pip install torch torchaudio --index-url https://download.pytorch.org/whl/cpu
-   
-   # Install Node.js dependencies
+
    npm install
    ```
 
-3. Download models:
+3. Download Whisper models:
    ```bash
    npm run download-models
    ```
@@ -79,93 +69,71 @@ A real-time voice-to-text transcription tool designed to work offline and online
 ## Usage
 
 ### Starting the Application
-
 ```bash
 npm start
 ```
 
-This will launch the Electron application and start the Python backend.
-
 ### Development Mode
-
 ```bash
 npm run dev
 ```
 
-This will start the application in development mode with hot reloading.
-
 ### Keyboard Shortcuts
-
-- **CommandOrControl+Shift+Space**: Start/stop listening (default, can be customized)
+- **CommandOrControl+Shift+Space**: Start/Stop Listening (default)
 
 ### Activation Methods
-
-- **Push-to-Talk**: Hold the hotkey while speaking, release to finalize
-- **Wake Word**: Say "Hey Genie" to start listening, automatic stop on silence
-- **Toggle Mode**: Activate for continuous transcription until manually stopped
+- **Push-to-Talk**: Hold hotkey while speaking
+- **Wake Word**: Say "Hey Genie" to start listening
+- **Toggle Mode**: Continuous transcription until manually stopped
 
 ### Settings
-
-- **Model Size**: Choose between tiny, base, small, medium, or large Whisper models
-- **Sensitivity**: Adjust the sensitivity of the Voice Activity Detection
-- **Activation Mode**: Select between push-to-talk, wake word, or always-on
-- **IDE Integration**: Choose which IDE to inject text into
-- **Theme**: Select between dark and light themes
-- **Always on Top**: Keep the window on top of other windows
-- **Start Minimized**: Start the application minimized to the system tray
-- **Start with System**: Start the application when the system starts
+- Model size selection (tiny, base, small, medium, large)
+- Sensitivity adjustment
+- Activation mode selection
+- IDE integration target (future)
+- Theme (light/dark)
+- Always-on-top toggle
+- Start minimized
+- Auto-start with system
 
 ## Testing
 
-The project includes comprehensive test scripts to verify the functionality of various components:
-
 ### Running Tests
 
-Make sure your virtual environment is activated, then run:
-
+Ensure virtual environment is activated, then:
 ```bash
-# Test Whisper transcription
 python tests/test_whisper.py
-
-# Test Voice Activity Detection
 python tests/test_vad.py
-
-# Test IDE integration
 python tests/test_ide_integration.py
 ```
 
 ### Test Scripts
-
-- **test_whisper.py**: Tests the Whisper transcription model loading and basic transcription
-- **test_vad.py**: Tests the Voice Activity Detection functionality
-- **test_ide_integration.py**: Tests the clipboard and IDE integration functionality
-
-These tests help ensure that all components are working correctly and can be used to troubleshoot issues.
+- **test_whisper.py**: Whisper model testing
+- **test_vad.py**: Voice activity detection testing
+- **test_ide_integration.py**: IDE clipboard injection testing (future phase)
 
 ## Building
 
 ### Package the Application
-
 ```bash
 npm run package
 ```
 
 ### Create Installers
-
 ```bash
 npm run make
 ```
 
 ## Project Structure
 
-- `/electron`: Electron main process code
-- `/src`: Frontend React components and logic
+- `/electron`: Electron main process
+- `/src`: React frontend components
 - `/python`: Python backend for Whisper and audio processing
-- `/models`: Pre-downloaded Whisper models
-- `/scripts`: Build and utility scripts
-- `/docs`: Project documentation
-- `/memory-bank`: Roo Code memory bank files
-- `/tests`: Test scripts and testing utilities
+- `/models`: Whisper model files
+- `/scripts`: Utility scripts
+- `/docs`: Documentation
+- `/memory-bank`: AI agent memory bank
+- `/tests`: Test scripts
 
 ## Contributing
 
@@ -177,12 +145,12 @@ npm run make
 
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+**This project is proprietary and privately owned by KrowFlow. All rights reserved. Unauthorized copying, distribution, modification, or use is strictly prohibited.**
 
 ## Acknowledgements
 
-- [OpenAI Whisper](https://github.com/openai/whisper) for the speech recognition model
-- [Faster Whisper](https://github.com/guillaumekln/faster-whisper) for the optimized Whisper implementation
-- [Silero VAD](https://github.com/snakers4/silero-vad) for Voice Activity Detection
-- [Electron](https://www.electronjs.org/) for the desktop application framework
-- [React](https://reactjs.org/) for the UI components
+- [OpenAI Whisper](https://github.com/openai/whisper)
+- [Faster Whisper](https://github.com/guillaumekln/faster-whisper)
+- [Silero VAD](https://github.com/snakers4/silero-vad)
+- [Electron](https://www.electronjs.org/)
+- [React](https://reactjs.org/)
