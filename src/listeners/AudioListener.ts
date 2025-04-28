@@ -24,10 +24,12 @@ interface AudioListenerConfig {
  * WebSocket message format from the Python backend
  */
 interface AudioLoudnessMessage {
-  /** Audio loudness level (0-1000) */
-  loudness: number;
+  /** Message type (e.g., "loudness") */
+  type: string;
+  /** Audio loudness level (0.0-1.0) */
+  value: number;
   /** Timestamp from the server */
-  timestamp: number;
+  timestamp?: number;
 }
 
 /**
@@ -37,7 +39,7 @@ const DEFAULT_CONFIG: AudioListenerConfig = {
   threshold: 500,
   checkInterval: 100,
   decayRate: 0.3,
-  websocketUrl: 'ws://localhost:6789',
+  websocketUrl: 'ws://localhost:8000',
   reconnectDelay: 2000,
   maxReconnectAttempts: 5
 };
@@ -127,10 +129,14 @@ export function useAudioListener(config: Partial<AudioListenerConfig> = {}) {
             // Parse the message
             const message = JSON.parse(event.data) as AudioLoudnessMessage;
 
-            // Apply smoothing with decay for more natural transitions
-            const newLevel = message.loudness;
-            currentLevelRef.current = currentLevelRef.current * (1 - mergedConfig.decayRate) +
-                                      newLevel * mergedConfig.decayRate;
+            // Only process loudness messages
+            if (message.type === 'loudness') {
+              // Apply smoothing with decay for more natural transitions
+              // Scale the value from 0-1 to 0-1000 for compatibility with existing code
+              const newLevel = message.value * 1000;
+              currentLevelRef.current = currentLevelRef.current * (1 - mergedConfig.decayRate) +
+                                        newLevel * mergedConfig.decayRate;
+            }
 
             // Update state with current level
             const roundedLevel = Math.round(currentLevelRef.current);
@@ -318,10 +324,14 @@ export class AudioListenerService {
       // Parse the message
       const message = JSON.parse(event.data) as AudioLoudnessMessage;
 
-      // Apply smoothing with decay for more natural transitions
-      const newLevel = message.loudness;
-      this.currentLevel = this.currentLevel * (1 - this.config.decayRate) +
-                         newLevel * this.config.decayRate;
+      // Only process loudness messages
+      if (message.type === 'loudness') {
+        // Apply smoothing with decay for more natural transitions
+        // Scale the value from 0-1 to 0-1000 for compatibility with existing code
+        const newLevel = message.value * 1000;
+        this.currentLevel = this.currentLevel * (1 - this.config.decayRate) +
+                           newLevel * this.config.decayRate;
+      }
 
       // Determine if we're listening based on threshold
       const isListening = this.currentLevel > this.config.threshold;
