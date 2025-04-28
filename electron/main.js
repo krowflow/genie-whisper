@@ -71,35 +71,49 @@ function createMainWindow() {
 
 // Create the system tray
 function createTray() {
-  tray = new Tray(path.join(__dirname, '../images/Genie.png'));
-  
-  const contextMenu = Menu.buildFromTemplate([
-    { label: 'Show Genie Whisper', click: () => mainWindow.show() },
-    { type: 'separator' },
-    { label: 'Start Listening', click: () => startListening() },
-    { label: 'Stop Listening', click: () => stopListening() },
-    { type: 'separator' },
-    { label: 'Settings', click: () => showSettings() },
-    { type: 'separator' },
-    { label: 'Quit', click: () => quitApp() },
-  ]);
-  
-  tray.setToolTip('Genie Whisper');
-  tray.setContextMenu(contextMenu);
-  
-  tray.on('click', () => {
-    if (mainWindow.isVisible()) {
-      mainWindow.hide();
-    } else {
-      mainWindow.show();
-    }
-  });
+  console.log("Tray creation skipped temporarily to avoid crash.");
+
+  /*
+  try {
+    // Use path.resolve instead of path.join to handle spaces in paths correctly
+    const iconPath = path.resolve(__dirname, '..', 'images', 'Genie.png');
+    tray = new Tray(iconPath);
+
+    const contextMenu = Menu.buildFromTemplate([
+      { label: 'Show Genie Whisper', click: () => mainWindow.show() },
+      { type: 'separator' },
+      { label: 'Start Listening', click: () => startListening() },
+      { label: 'Stop Listening', click: () => stopListening() },
+      { type: 'separator' },
+      { label: 'Settings', click: () => showSettings() },
+      { type: 'separator' },
+      { label: 'Quit', click: () => quitApp() },
+    ]);
+
+    tray.setToolTip('Genie Whisper');
+    tray.setContextMenu(contextMenu);
+
+    tray.on('click', () => {
+      if (mainWindow.isVisible()) {
+        mainWindow.hide();
+      } else {
+        mainWindow.show();
+      }
+    });
+  } catch (error) {
+    console.error('Failed to create tray icon:', error);
+    // Create a fallback tray with a simple empty image
+    const emptyImage = Buffer.alloc(16 * 16 * 4); // 16x16 transparent image
+    tray = new Tray(emptyImage);
+    tray.setToolTip('Genie Whisper (Icon Failed to Load)');
+  }
+  */
 }
 
 // Start the Python backend
 function startPythonBackend() {
   const settings = store.get('settings');
-  
+
   const options = {
     mode: 'text',
     pythonPath: 'python', // Adjust based on environment
@@ -114,47 +128,83 @@ function startPythonBackend() {
       '--activation-mode', settings.activationMode || 'manual',
     ],
   };
-  
+
   // Add IDE parameter if specified
   if (settings.ide) {
     options.args.push('--ide', settings.ide);
   }
 
-  pythonProcess = new PythonShell('server.py', options);
-  
-  pythonProcess.on('message', (message) => {
-    try {
-      // Parse message as JSON
-      const data = JSON.parse(message);
-      
-      // Forward messages to renderer
-      if (mainWindow) {
-        mainWindow.webContents.send('python-message', message);
-        
-        // Handle specific message types
-        if (data.type === 'wake_word_detected') {
-          // Show window when wake word is detected
-          mainWindow.show();
-        }
-      }
-    } catch (error) {
-      console.error('Error parsing Python message:', error);
-      // Forward raw message if parsing fails
-      if (mainWindow) {
-        mainWindow.webContents.send('python-message', message);
-      }
-    }
+  // Use spawn instead of PythonShell for better control over stdout/stderr
+  const { spawn } = require('child_process');
+
+  // Build command and arguments
+  const pythonPath = options.pythonPath || 'python';
+  const pythonArgs = [...(options.pythonOptions || [])];
+  const scriptPath = path.join(options.scriptPath, 'server.py');
+  pythonArgs.push(scriptPath);
+  pythonArgs.push(...options.args);
+
+  // Spawn Python process
+  const pythonSpawnProcess = spawn(pythonPath, pythonArgs, {
+    stdio: ['pipe', 'pipe', 'pipe']
   });
-  
-  pythonProcess.on('error', (err) => {
-    console.error('Python Error:', err);
+
+  // Create a wrapper object to maintain compatibility with PythonShell API
+  pythonProcess = {
+    _process: pythonSpawnProcess,
+    send: (message) => {
+      if (pythonSpawnProcess.stdin) {
+        pythonSpawnProcess.stdin.write(message + '\n');
+      }
+    },
+    end: () => {
+      pythonSpawnProcess.kill();
+    }
+  };
+
+  // Handle stdout (clean JSON messages)
+  pythonSpawnProcess.stdout.on('data', (data) => {
+    const lines = data.toString().trim().split('\n').filter(Boolean);
+
+    lines.forEach(line => {
+      try {
+        // Parse message as JSON
+        const jsonData = JSON.parse(line);
+
+        // Forward messages to renderer
+        if (mainWindow) {
+          mainWindow.webContents.send('python-message', line);
+
+          // Handle specific message types
+          if (jsonData.type === 'wake_word_detected') {
+            // Show window when wake word is detected
+            mainWindow.show();
+          }
+        }
+      } catch (error) {
+        // Log parsing errors without crashing
+        console.error('Invalid JSON from Python stdout:', line);
+      }
+    });
+  });
+
+  // Handle stderr (logs and errors)
+  pythonSpawnProcess.stderr.on('data', (data) => {
+    // Log Python stderr output to console
+    console.log('[Python stderr]', data.toString().trim());
+  });
+
+  // Handle process errors
+  pythonSpawnProcess.on('error', (err) => {
+    console.error('Python Process Error:', err);
     if (mainWindow) {
       mainWindow.webContents.send('python-error', err.toString());
     }
   });
-  
-  pythonProcess.on('close', () => {
-    console.log('Python process closed');
+
+  // Handle process exit
+  pythonSpawnProcess.on('close', (code) => {
+    console.log(`Python process closed with code ${code}`);
     pythonProcess = null;
   });
 }
@@ -162,7 +212,13 @@ function startPythonBackend() {
 // Send command to Python backend
 function sendToPython(command) {
   if (pythonProcess) {
-    pythonProcess.send(JSON.stringify(command));
+    try {
+      // Ensure command is properly JSON stringified
+      const jsonCommand = JSON.stringify(command);
+      pythonProcess.send(jsonCommand);
+    } catch (error) {
+      console.error('Error sending command to Python:', error);
+    }
   } else {
     console.error('Python process not running');
   }
@@ -173,7 +229,7 @@ function startListening() {
   if (pythonProcess) {
     sendToPython({ type: 'start_listening' });
   }
-  
+
   if (mainWindow) {
     mainWindow.webContents.send('start-listening');
   }
@@ -184,7 +240,7 @@ function stopListening() {
   if (pythonProcess) {
     sendToPython({ type: 'stop_listening' });
   }
-  
+
   if (mainWindow) {
     mainWindow.webContents.send('stop-listening');
   }
@@ -201,12 +257,12 @@ function showSettings() {
 // Quit the application
 function quitApp() {
   isQuitting = true;
-  
+
   // Clean up Python process
   if (pythonProcess) {
     pythonProcess.end();
   }
-  
+
   app.quit();
 }
 
@@ -215,13 +271,13 @@ app.whenReady().then(() => {
   createMainWindow();
   createTray();
   startPythonBackend();
-  
+
   // Register global shortcut
   const hotkey = store.get('settings.hotkey', defaultSettings.hotkey);
   globalShortcut.register(hotkey, () => {
     startListening();
   });
-  
+
   // macOS: Re-create window when dock icon is clicked
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
@@ -248,14 +304,14 @@ app.on('will-quit', () => {
 // IPC handlers
 ipcMain.on('update-settings', (event, settings) => {
   store.set('settings', settings);
-  
+
   // Update hotkey if changed
   const currentHotkey = store.get('settings.hotkey');
   globalShortcut.unregisterAll();
   globalShortcut.register(currentHotkey, () => {
     startListening();
   });
-  
+
   // Update Python backend with new settings
   if (pythonProcess) {
     sendToPython({
