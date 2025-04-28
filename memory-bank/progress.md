@@ -322,3 +322,67 @@ As the project is pivoting to a Jarvis-like assistant, there are some known issu
   - Adds back the period to each valid sentence.
 - Example Input: `"Hello world. This is a test. Another sentence."`
 - Example Output: `["Hello world.", "This is a test.", "Another sentence."]`
+
+## HUD Waveform Augment Implementation - April 27, 2025
+
+### Components Added
+
+#### WaveformHUD Component
+
+- Purpose: Displays a visual indicator showing whether the system is listening.
+- Features:
+  - Changes background color based on listening state (green when listening, gray when not).
+  - Displays "Listening..." text when active, "Waveform HUD Active" when inactive.
+  - Accepts a boolean `listening` prop to control its state.
+  - Uses inline styles for simple visual presentation.
+
+#### HUDTestWrapper Component
+
+- Purpose: Test harness for the WaveformHUD component.
+- Features:
+  - Connects to the AudioListener service to get real-time audio levels.
+  - Displays current audio level and listening state.
+  - Visualizes audio levels with a dynamic progress bar.
+  - Passes the listening state to the WaveformHUD component.
+
+### Services Added
+
+#### AudioListener Service
+
+- Purpose: Detects audio input and determines when the user is speaking.
+- Features:
+  - Connects to WebSocket server on localhost:6789.
+  - Receives real-time audio loudness levels from Python backend.
+  - Determines listening state based on configurable threshold.
+  - Provides both React hook (useAudioListener) and standalone service.
+  - Implements automatic reconnection with configurable attempts.
+  - Falls back to simulation if WebSocket connection fails.
+  - Smooths audio levels for natural transitions.
+
+### Backend Enhancements
+
+#### AudioCapture Class
+
+- Purpose: Captures audio from microphone and processes it for the system.
+- Enhancements:
+  - Added gain boost functionality for low-output microphones like the Shure SM7B.
+  - Implemented limiter to prevent digital clipping after boosting.
+  - Added WebSocket server to stream real-time loudness levels.
+  - Calculates and broadcasts audio loudness to connected clients.
+  - Handles WebSocket connections and disconnections gracefully.
+  - Runs WebSocket server in a separate thread to avoid blocking audio processing.
+
+### Integration Points
+
+- Python backend (AudioCapture) → WebSocket → TypeScript frontend (AudioListener)
+- AudioListener → React components (HUDTestWrapper → WaveformHUD)
+
+### Technical Details
+
+- WebSocket server runs on port 6789.
+- Audio loudness normalized to 0-1000 scale for consistent frontend visualization.
+- Messages include timestamp for potential future synchronization needs.
+- Gain boost applies a configurable multiplier to audio samples.
+- Limiter constrains audio to 16-bit PCM safe range [-32768, 32767].
+- WebSocket reconnection attempts configurable (default: 5 attempts).
+- Reconnection delay configurable (default: 2000ms).
