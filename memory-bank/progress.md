@@ -46,7 +46,7 @@ We are pivoting the project to become a full Jarvis-like voice assistant with:
 After researching available technologies, we've decided to focus on currently available, proven technologies:
 
 1. **Speech Recognition**: OpenAI Whisper (local implementation)
-2. **Text-to-Speech**: 
+2. **Text-to-Speech**:
    - Primary option: Mozilla TTS (free, local, good documentation)
    - Alternative option: Spark-TTS (higher quality, voice cloning, but more resource-intensive)
 3. **Voice Activity Detection**: Hybrid approach with WebRTC VAD and Silero VAD
@@ -295,3 +295,18 @@ As the project is pivoting to a Jarvis-like assistant, there are some known issu
 | **Local Knowledge Limitations** | Medium | Medium | Optimize storage and retrieval, implement efficient compression, add update mechanisms |
 | **Text-to-Speech Quality** | Medium | Medium | Start with Mozilla TTS, design for future Spark-TTS integration, implement voice selection |
 | **Audio Device Conflicts** | Medium | Medium | Implement audio device manager to coordinate between input and output |
+
+## Utility Functions Documentation
+
+### formatTranscript(text: string): string
+
+- Purpose: Cleans up raw transcribed text by trimming spaces, capitalizing the first letter, and ensuring the text ends with a period.
+
+### sanitizeTranscript(text: string): string
+
+- Purpose: Sanitizes transcription text by:
+  - Trimming leading and trailing whitespace
+  - Removing tab (\t) and newline (\n) characters
+  - Collapsing multiple consecutive spaces into a single space.
+- Example Input: `"   Hello\tworld\n\nthis   is   a    test. "`
+- Example Output: `"Hello world this is a test."`
