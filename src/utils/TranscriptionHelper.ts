@@ -59,3 +59,32 @@ export function sanitizeTranscript(text: string): string {
 
   return sanitized;
 }
+
+/**
+ * Splits a transcription string into an array of sentences.
+ * - Splits on periods (.)
+ * - Trims whitespace from each sentence
+ * - Filters out empty sentences
+ *
+ * @example
+ * // Returns ["Hello world.", "This is a test.", "Another sentence."]
+ * splitTranscriptIntoSentences("Hello world. This is a test. Another sentence.");
+ *
+ * @param text The input transcription text
+ * @returns An array of sentences
+ */
+export function splitTranscriptIntoSentences(text: string): string[] {
+  // If the input is empty, return an empty array
+  if (!text || text.trim() === '') {
+    return [];
+  }
+
+  // Split the text by periods
+  const sentences = text.split('.');
+
+  // Process each sentence: trim whitespace and add back the period
+  return sentences
+    .map(sentence => sentence.trim())
+    .filter(sentence => sentence.length > 0)
+    .map(sentence => `${sentence}.`);
+}
