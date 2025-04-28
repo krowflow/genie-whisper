@@ -310,3 +310,15 @@ As the project is pivoting to a Jarvis-like assistant, there are some known issu
   - Collapsing multiple consecutive spaces into a single space.
 - Example Input: `"   Hello\tworld\n\nthis   is   a    test. "`
 - Example Output: `"Hello world this is a test."`
+
+### splitTranscriptIntoSentences(text: string): string[]
+
+- Purpose: Splits a transcription text into an array of individual sentences.
+- Behavior:
+  - Handles empty input by returning an empty array.
+  - Splits the text by periods (.).
+  - Trims whitespace from each resulting sentence.
+  - Filters out any empty sentences.
+  - Adds back the period to each valid sentence.
+- Example Input: `"Hello world. This is a test. Another sentence."`
+- Example Output: `["Hello world.", "This is a test.", "Another sentence."]`
